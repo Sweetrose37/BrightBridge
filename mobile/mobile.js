@@ -1,5 +1,224 @@
 (function () {
   "use strict";
+  const stages=[
+    {id:"early-explorer",icon:"🌱",name:"Early Explorer",ages:"Approx. ages 2–4",focus:"First communication, colors, shapes, sounds, sensory discovery, and routines."},
+    {id:"growing-learner",icon:"🌿",name:"Growing Learner",ages:"Approx. ages 5–8",focus:"Reading readiness, math, social skills, daily living, and expanded communication."},
+    {id:"independent-communicator",icon:"🌳",name:"Independent Communicator",ages:"Approx. ages 9–12",focus:"Sentence building, goals, school support, regulation, and independence."},
+    {id:"teen-young-adult",icon:"✨",name:"Teen & Young Adult",ages:"Approx. ages 13+",focus:"Life skills, self-advocacy, community navigation, wellness, and future goals."}
+  ];
+  let epoch=0;
+  let active=false;
+  let memorySection="hub";
+  let dbPromise=null;
+  let recorder=null;
+  let stream=null;
+  let chunks=[];
+  let startedAt=0;
+  let urls=[];
+
+  function esc(value=""){return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));}
+  function profile(){const data=BB.store.data;return data.profiles.find(item=>item.id===data.activeProfile)||data.profiles[0];}
+  function state(){
+    const memory=BB.store.data.memoryJourney;
+    memory.events ||= [];
+    memory.mobileLetters ||= [];
+    return memory;
+  }
+  function growth(){
+    const child=profile();
+    child.growthPath||=JSON.parse(JSON.stringify(state().growthPath));
+    child.growthPath.enabledFeatures||={communication:true,learning:true,sensory:true,music:true,nature:true,emotions:true,rewards:true};
+    return child.growthPath;
+  }
+  function formatDate(value){if(!value)return "Date not added";const date=new Date(value);return Number.isNaN(date.getTime())?value:date.toLocaleString([],{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
+  function localDateTime(){const date=new Date(),offset=date.getTimezoneOffset();return new Date(date.getTime()-offset*60000).toISOString().slice(0,16);}
+
+  function database(){
+    if(dbPromise)return dbPromise;
+    dbPromise=new Promise((resolve,reject)=>{
+      if(!window.indexedDB){reject(new Error("Private storage unavailable"));return;}
+      const request=indexedDB.open("brightbridge-private-journey",1);
+      let settled=false;
+      const timer=setTimeout(()=>finish(reject,new Error("Private storage timed out")),2500);
+      const finish=(callback,value)=>{if(settled)return;settled=true;clearTimeout(timer);callback(value);};
+      request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains("voices"))db.createObjectStore("voices",{keyPath:"id"});if(!db.objectStoreNames.contains("letters"))db.createObjectStore("letters",{keyPath:"id"});};
+      request.onsuccess=()=>finish(resolve,request.result);
+      request.onerror=()=>finish(reject,request.error);
+      request.onblocked=()=>finish(reject,new Error("Private storage blocked"));
+    }).catch(error=>{dbPromise=null;throw error;});
+    return dbPromise;
+  }
+  async function privateStore(name,mode,operation){
+    const db=await database();
+    return new Promise((resolve,reject)=>{
+      try{const request=operation(db.transaction(name,mode).objectStore(name));request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);}
+      catch(error){reject(error);}
+    });
+  }
+  function voiceStore(mode,operation){return privateStore("voices",mode,operation);}
+  async function voices(){
+    try{return (await voiceStore("readonly",store=>store.getAll())).filter(item=>item.profileId===BB.store.data.activeProfile).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));}
+    catch{return [];}
+  }
+  function saveVoice(record){return voiceStore("readwrite",store=>store.put(record));}
+  function removeVoice(id){return voiceStore("readwrite",store=>store.delete(id));}
+  async function letters(){
+    let privateLetters=[];
+    try{privateLetters=await privateStore("letters","readonly",store=>store.getAll());}catch{}
+    const localLetters=state().mobileLetters||[];
+    return [...privateLetters,...localLetters].filter(item=>item.profileId===BB.store.data.activeProfile).sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt));
+  }
+
+  function tabs(){
+    return `<div class="mobile-category-row">${[["hub","✨","Memory Home"],["voice","🎤","Voice Journey"],["timeline","🌈","Timeline"],["letters","💌","Letters"],["growth","🌱","Growth Paths"]].map(([id,icon,label])=>`<button class="mobile-chip ${memorySection===id?"active":""}" type="button" data-mobile-memory-open="${id}">${icon} ${label}</button>`).join("")}</div>`;
+  }
+  function shell(title,subtitle,content){
+    return `<section>${BB.navigation.pageHead(title,subtitle,"parent")}${tabs()}${content}</section>`;
+  }
+  function safeScreen(message){
+    return shell("Private Memories","Nothing was deleted.",`<div class="mobile-panel" style="text-align:center"><div style="font-size:58px">💜</div><h2>Your memories are safe</h2><p>${esc(message)}</p><div class="mobile-button-row"><button class="mobile-button" type="button" data-mobile-memory-open="${memorySection}">Try again</button><button class="mobile-button secondary" type="button" data-route="parent">Back</button></div></div>`);
+  }
+
+  async function renderHub(){
+    const voiceItems=await voices(),letterItems=await letters(),path=growth();
+    const stage=stages.find(item=>item.id===path.stage)||stages[0];
+    return shell("Private Memory Home",`A private, caregiver-controlled story for ${profile().name}.`,`
+      <div class="mobile-panel"><h3>🔒 Private by default</h3><p>Recordings, letters, and milestones remain on this device. BrightBridge never translates, decodes, diagnoses, or infers meaning from vocalizations.</p></div>
+      <div class="mobile-memory-grid">
+        <button class="mobile-memory-button" type="button" data-mobile-memory-open="voice"><span>🎤</span>Voice Journey<small>${voiceItems.length} recordings</small></button>
+        <button class="mobile-memory-button" type="button" data-mobile-memory-open="timeline"><span>🌈</span>Growth Timeline<small>${state().events.length} moments</small></button>
+        <button class="mobile-memory-button" type="button" data-mobile-memory-open="letters"><span>💌</span>Future Letters<small>${letterItems.length} letters</small></button>
+        <button class="mobile-memory-button" type="button" data-mobile-memory-open="growth"><span>${stage.icon}</span>Growth Paths<small>${stage.name}</small></button>
+      </div>`);
+  }
+  async function renderVoice(){
+    const items=await voices();
+    revokeUrls();
+    return shell("Voice Journey™","Caregiver-authored memories of meaningful vocal moments.",`
+      <div class="mobile-panel"><h3>Add a private recording</h3>
+        <label class="mobile-setting-row"><span><strong>Title</strong></span><input data-mv-title maxlength="80" placeholder='First “Mama”'></label>
+        <label class="mobile-setting-row"><span><strong>Date and time</strong></span><input type="datetime-local" data-mv-date value="${localDateTime()}"></label>
+        <label class="mobile-setting-row"><span><strong>Child age</strong></span><input data-mv-age maxlength="30" placeholder="3 years, 2 months"></label>
+        <label class="mobile-setting-row"><span><strong>Notes</strong></span><textarea data-mv-notes rows="3" maxlength="800"></textarea></label>
+        <label class="mobile-setting-row"><span><strong>Milestone</strong><small>Caregiver-defined</small></span><input type="checkbox" data-mv-milestone></label>
+        <div class="mobile-button-row"><button class="mobile-button" type="button" data-mv-record>🎙️ Record</button><label class="mobile-button secondary">⬆ Upload<input class="sr-only" type="file" accept="audio/*" data-mv-upload></label><button class="mobile-button danger" type="button" data-mv-stop hidden>■ Stop</button></div>
+        <p class="muted" data-mv-status>Audio stays on this device.</p>
+      </div>
+      <div class="mobile-list">${items.length?items.map(item=>voiceCard(item)).join(""):`<div class="mobile-panel"><h3>Your first recording starts the timeline</h3><p>Try a title such as Morning Babble, Story Time, or First Word.</p></div>`}</div>`);
+  }
+  function voiceCard(item){
+    const url=URL.createObjectURL(item.blob);urls.push(url);
+    return `<article class="mobile-panel"><h3>${item.milestone?"⭐ ":""}${esc(item.title)}</h3><p class="muted">${formatDate(item.dateTime)} · Age ${esc(item.age||"not added")}</p><audio controls preload="metadata" src="${url}" style="width:100%"></audio>${item.notes?`<p>${esc(item.notes)}</p>`:""}<button class="mobile-button danger" type="button" data-mv-delete="${item.id}">Delete</button></article>`;
+  }
+  function computedTimeline(){
+    const data=BB.store.data,items=state().events.filter(item=>!item.profileId||item.profileId===data.activeProfile);
+    if(data.stars)items.push({date:new Date().toISOString(),icon:"⭐",title:`${data.stars} learning stars`,detail:"Personal learning progress"});
+    if(data.flowers)items.push({date:new Date().toISOString(),icon:"🌻",title:`${data.flowers} flowers grown`,detail:"Reward Garden growth"});
+    return items.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  }
+  async function renderTimeline(){
+    const items=computedTimeline(),voiceItems=await voices(),letterItems=await letters();
+    return shell("Look How Far I’ve Come™","Celebrate only this child's own progress.",`
+      <div class="mobile-stats"><div class="mobile-stat"><strong>⭐ ${BB.store.data.stars}</strong><span>Stars</span></div><div class="mobile-stat"><strong>🌻 ${BB.store.data.flowers}</strong><span>Flowers</span></div><div class="mobile-stat"><strong>🎤 ${voiceItems.length}</strong><span>Voice memories</span></div><div class="mobile-stat"><strong>💌 ${letterItems.length}</strong><span>Letters</span></div></div>
+      <div class="mobile-list" style="margin-top:13px">${items.length?items.map(item=>`<article class="mobile-list-card"><span>${item.icon||"✨"}</span><div><strong>${esc(item.title)}</strong><small>${formatDate(item.date)} · ${esc(item.detail||"Meaningful progress")}</small></div></article>`).join(""):`<div class="mobile-panel"><h3>This journey is ready to grow</h3><p>Personal milestones will appear as BrightBridge is used.</p></div>`}</div>`);
+  }
+  async function renderLetters(){
+    const letterItems=await letters();
+    return shell("Letters to My Future Self™","Private messages of love, encouragement, and memories.",`
+      <div class="mobile-panel"><h3>Write a letter</h3><label class="mobile-setting-row"><span><strong>Title</strong></span><input data-ml-title maxlength="100" placeholder="A memory for your future"></label><label class="mobile-setting-row"><span><strong>Author</strong></span><input data-ml-author maxlength="60" placeholder="Mom, Dad, Grandma…"></label><label class="mobile-setting-row"><span><strong>Letter</strong></span><textarea data-ml-body rows="7" maxlength="5000" placeholder="Today you surprised me by…"></textarea></label><button class="mobile-button" type="button" data-ml-save>Save private letter</button></div>
+      <div class="mobile-list">${letterItems.length?letterItems.map(letter=>`<article class="mobile-panel"><h3>💌 ${esc(letter.title)}</h3><p class="muted">${formatDate(letter.date||letter.createdAt)} · From ${esc(letter.author||"Caregiver")}</p><p>${esc(letter.body||letter.content||"")}</p><button class="mobile-button danger" type="button" data-ml-delete="${letter.id}">Delete</button></article>`).join(""):`<div class="mobile-panel"><p>No letters yet. A future keepsake can begin today.</p></div>`}</div>`);
+  }
+  function renderGrowth(){
+    const path=growth();
+    return shell("BrightBridge Growth Paths™","Caregiver-controlled stages that never erase history.",`
+      <div class="mobile-panel"><h3>Caregiver promise</h3><p>Changing a stage updates age-appropriate presentation and vocabulary. Voice memories, letters, rewards, achievements, and communication history remain preserved.</p></div>
+      <div class="mobile-list">${stages.map((stage,index)=>`<article class="mobile-panel" style="${path.stage===stage.id?"border:3px solid var(--purple)":""}"><div style="font-size:44px">${stage.icon}</div><p class="muted">Stage ${index+1} · ${stage.ages}</p><h2>${stage.name}</h2><p>${stage.focus}</p><button class="mobile-button ${path.stage===stage.id?"secondary":""}" type="button" data-mg-stage="${stage.id}">${path.stage===stage.id?"Current stage":"Choose stage"}</button></article>`).join("")}</div>
+      <div class="mobile-setting-group"><h3>Available child features</h3>${Object.entries(path.enabledFeatures).map(([key,on])=>`<div class="mobile-setting-row"><span><strong>${key[0].toUpperCase()+key.slice(1)}</strong></span><button class="mobile-switch ${on?"on":""}" type="button" data-mg-feature="${key}"><i></i></button></div>`).join("")}</div>`);
+  }
+
+  async function open(next="hub",options={}){
+    if(!BB.app?.isParentUnlocked?.()){BB.navigation.go("parent");return;}
+    if(BB.navigation.current!=="memory"){if(options.withinRoute)return;BB.navigation.go("memory",{section:next});return;}
+    const token=++epoch;active=true;memorySection=next;
+    let content;
+    try{
+      const renderer={hub:renderHub,voice:renderVoice,timeline:renderTimeline,letters:renderLetters,growth:renderGrowth}[next]||renderHub;
+      content=await Promise.race([renderer(),new Promise((_,reject)=>setTimeout(()=>reject(new Error("Memory screen timed out")),4500))]);
+    }catch{content=safeScreen("Private storage did not open this time. Please try again.");}
+    if(token!==epoch||!active||BB.navigation.current!=="memory")return;
+    const view=document.querySelector("#view");view.innerHTML=content;view.focus({preventScroll:true});
+  }
+  function cancelView(){active=false;epoch++;revokeUrls();}
+  function revokeUrls(){urls.forEach(url=>URL.revokeObjectURL(url));urls=[];}
+  function track(type,title,options={}){
+    const memory=state();
+    if(options.onceKey&&memory.events.some(item=>item.onceKey===options.onceKey&&item.profileId===BB.store.data.activeProfile))return;
+    memory.events.push({id:`event-${Date.now()}`,profileId:BB.store.data.activeProfile,type,title,date:new Date().toISOString(),icon:options.icon||"✨",detail:options.detail||"",onceKey:options.onceKey||""});
+    BB.store.save();
+  }
+  function applyGrowthPath(){
+    const path=growth();document.body.dataset.growthStage=path.stage;
+    Object.entries(path.enabledFeatures).forEach(([key,on])=>document.body.classList.toggle(`feature-disabled-${key}`,!on));
+  }
+  function stageVocabulary(){
+    const words={
+      "early-explorer":[["Again please","🔁"],["Look with me","👀"],["My favorite","💜"]],
+      "growing-learner":[["I can read","📖"],["What comes next?","➡️"],["I need a schedule","📅"]],
+      "independent-communicator":[["I have a goal","🎯"],["I need more time","⏳"],["Can you explain?","💡"]],
+      "teen-young-adult":[["I can speak up for myself","📣"],["I need transportation","🚌"],["My future goal","✨"]]
+    };
+    return words[growth().stage]||words["early-explorer"];
+  }
+  function homeBanner(){
+    const stage=stages.find(item=>item.id===growth().stage)||stages[0];
+    return `<div class="mobile-panel" style="display:flex;align-items:center;gap:12px;margin-top:13px"><span style="font-size:40px">${stage.icon}</span><div><small class="muted">My BrightBridge Growth Path</small><h3 style="margin:2px 0">${stage.name}</h3><p>${stage.focus}</p></div></div>`;
+  }
+  async function clear(){
+    state().events=[];state().mobileLetters=[];BB.store.save();
+    try{await Promise.all([voiceStore("readwrite",store=>store.clear()),privateStore("letters","readwrite",store=>store.clear())]);}catch{}
+  }
+
+  function voiceMetadata(){
+    return {title:document.querySelector("[data-mv-title]")?.value.trim(),dateTime:document.querySelector("[data-mv-date]")?.value||new Date().toISOString(),age:document.querySelector("[data-mv-age]")?.value.trim(),notes:document.querySelector("[data-mv-notes]")?.value.trim(),milestone:!!document.querySelector("[data-mv-milestone]")?.checked};
+  }
+  async function storeVoiceBlob(blob,duration=0){
+    const meta=voiceMetadata();
+    if(!meta.title){BB.app.toast("Add a recording title first.");return;}
+    await saveVoice({...meta,id:`voice-${Date.now()}`,profileId:BB.store.data.activeProfile,createdAt:new Date().toISOString(),duration,blob});
+    BB.app.toast("Voice Journey memory saved.");open("voice");
+  }
+  async function startVoiceRecording(){
+    const meta=voiceMetadata();if(!meta.title){BB.app.toast("Add a recording title first.");return;}
+    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){BB.app.toast("Recording is unavailable. Use Upload instead.");return;}
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({audio:true});recorder=new MediaRecorder(stream);chunks=[];startedAt=Date.now();
+      recorder.ondataavailable=event=>{if(event.data.size)chunks.push(event.data);};
+      recorder.onstop=async()=>{const blob=new Blob(chunks,{type:recorder.mimeType||"audio/webm"});stream?.getTracks().forEach(track=>track.stop());stream=null;await storeVoiceBlob(blob,(Date.now()-startedAt)/1000);};
+      recorder.start();document.querySelector("[data-mv-record]")?.setAttribute("hidden","");document.querySelector("[data-mv-stop]")?.removeAttribute("hidden");const status=document.querySelector("[data-mv-status]");if(status)status.innerHTML='<i class="recording-light"></i> Recording…';
+    }catch{BB.app.toast("Microphone permission was not available.");}
+  }
+  function stopVoiceRecording(){if(recorder?.state==="recording")recorder.stop();}
+
+  document.addEventListener("click",async event=>{
+    if(event.target.closest("[data-route]"))cancelView();
+    const openButton=event.target.closest("[data-mobile-memory-open]");if(openButton){open(openButton.dataset.mobileMemoryOpen);return;}
+    if(event.target.closest("[data-mv-record]")){startVoiceRecording();return;}
+    if(event.target.closest("[data-mv-stop]")){stopVoiceRecording();return;}
+    const voiceDelete=event.target.closest("[data-mv-delete]");if(voiceDelete&&confirm("Delete this private Voice Journey recording?")){await removeVoice(voiceDelete.dataset.mvDelete);open("voice");return;}
+    if(event.target.closest("[data-ml-save]")){const title=document.querySelector("[data-ml-title]")?.value.trim(),author=document.querySelector("[data-ml-author]")?.value.trim(),body=document.querySelector("[data-ml-body]")?.value.trim();if(!title||!body){BB.app.toast("Add a title and letter message.");return;}await privateStore("letters","readwrite",store=>store.put({id:`letter-${Date.now()}`,profileId:BB.store.data.activeProfile,title,author:author||"Caregiver",body,date:new Date().toISOString()}));BB.app.toast("Private letter saved.");open("letters");return;}
+    const letterDelete=event.target.closest("[data-ml-delete]");if(letterDelete&&confirm("Delete this private letter?")){try{await privateStore("letters","readwrite",store=>store.delete(letterDelete.dataset.mlDelete));}catch{}state().mobileLetters=state().mobileLetters.filter(item=>item.id!==letterDelete.dataset.mlDelete);BB.store.save();open("letters");return;}
+    const stage=event.target.closest("[data-mg-stage]");if(stage){growth().stage=stage.dataset.mgStage;BB.store.save();applyGrowthPath();BB.app.toast("Growth stage updated. All history was preserved.");open("growth");return;}
+    const feature=event.target.closest("[data-mg-feature]");if(feature){const key=feature.dataset.mgFeature;growth().enabledFeatures[key]=!growth().enabledFeatures[key];BB.store.save();applyGrowthPath();open("growth");return;}
+  });
+  document.addEventListener("change",event=>{if(event.target.matches("[data-mv-upload]")&&event.target.files[0]){const meta=voiceMetadata();if(!meta.title){BB.app.toast("Add a recording title first.");event.target.value="";return;}const file=event.target.files[0];if(!file.type.startsWith("audio/")||file.size>15*1024*1024){BB.app.toast("Choose an audio file smaller than 15 MB.");event.target.value="";return;}storeVoiceBlob(file,0);}});
+  window.addEventListener("bb:state",applyGrowthPath);
+  window.BB=window.BB||{};
+  BB.memoryJourney={open,cancelView,track,applyGrowthPath,stageVocabulary,homeBanner,clear};
+  applyGrowthPath();
+})();
+
+(function () {
+  "use strict";
 
   const view=document.querySelector("#view");
   const modalRoot=document.querySelector("#modal-root");
@@ -271,7 +490,7 @@
     return `<section>${pageHead("Parent Dashboard",`Private controls for ${profile.name}.`,"more")}
       <div class="mobile-stats"><div class="mobile-stat"><strong>${Math.floor(data.screenSeconds/60)}m</strong><span>App time</span></div><div class="mobile-stat"><strong>${data.stars}</strong><span>Stars</span></div></div>
       <div class="mobile-section-title"><h2>Memories & growth</h2></div>
-      <div class="mobile-memory-grid"><button class="mobile-memory-button" type="button" data-memory-open="voice"><span>🎤</span>Voice Journey</button><button class="mobile-memory-button" type="button" data-memory-open="timeline"><span>🌈</span>Growth Timeline</button><button class="mobile-memory-button" type="button" data-memory-open="letters"><span>💌</span>Future Letters</button><button class="mobile-memory-button" type="button" data-memory-open="growth"><span>🌱</span>Growth Paths</button></div>
+      <div class="mobile-memory-grid"><button class="mobile-memory-button" type="button" data-mobile-memory-open="voice"><span>🎤</span>Voice Journey</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="timeline"><span>🌈</span>Growth Timeline</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="letters"><span>💌</span>Future Letters</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="growth"><span>🌱</span>Growth Paths</button></div>
       <div class="mobile-setting-group" style="margin-top:13px"><h3>👤 Child profile</h3>
         <label class="mobile-setting-row"><span><strong>Active profile</strong></span><select data-profile>${data.profiles.map(item=>`<option value="${esc(item.id)}" ${item.id===data.activeProfile?"selected":""}>${item.avatar} ${esc(item.name)}</option>`).join("")}</select></label>
         <label class="mobile-setting-row"><span><strong>Display name</strong></span><input data-profile-name value="${esc(profile.name)}" maxlength="30"></label>
@@ -493,5 +712,5 @@
   BB.app={render:(next,options)=>{route=next;render(options);},pip,modal,closeModal,toast,isParentUnlocked:()=>parentUnlocked};
   BB.accessibility.apply();
   go("home",{replace:true});
-  if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+  if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("../service-worker.js").catch(()=>{});
 })();
