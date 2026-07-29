@@ -8,6 +8,7 @@
   .sentence-builder{top:70px}.pip{right:12px;bottom:94px}.pip-circle{width:61px;height:61px;font-size:34px}.pip-bubble{max-width:230px;font-size:13px}
   .parent-grid{grid-template-columns:1fr}.badge-grid{grid-template-columns:repeat(3,1fr)}.setting-row{align-items:flex-start;flex-wrap:wrap}.range,.select{width:100%;max-width:none;margin-left:0}.switch{margin-left:auto}
   .voice-form{grid-template-columns:1fr}.voice-row{flex-wrap:wrap}
+  .communication-voice-bar{align-items:stretch;flex-direction:column}.communication-voice-bar button{width:100%}.card-record-status{align-items:stretch;flex-direction:column}.card-record-status button{width:100%}
   .mobile-break{position:fixed;z-index:34;left:12px;bottom:96px;align-items:center;gap:6px;min-height:51px;padding:8px 13px;border:2px solid #bd763a;border-radius:999px;background:#fff0c7;box-shadow:0 7px 20px rgba(38,51,76,.18);color:#553300;font-weight:950;cursor:pointer}
   .guided-exit{position:fixed;z-index:80;top:10px;right:10px;align-items:center;justify-content:center;min-height:48px;padding:8px 13px;border:2px solid var(--line);border-radius:16px;background:var(--surface);font-weight:900}
   .guided-exit[hidden]{display:none!important}

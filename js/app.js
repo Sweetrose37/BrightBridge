@@ -21,6 +21,8 @@
   let voiceStream = null;
   let voiceChunks = [];
   let recordingLabel = "";
+  let communicationVoiceSetup = false;
+  let pinSuccess = null;
 
   const homeCards = [
     ["communication","💬","Communication","Build words and sentences","#ffe3dc","AAC"],
@@ -82,7 +84,7 @@
   }
 
   function render(route, options = {}) {
-    if (route !== "parent" && voiceRecorder?.state === "recording") stopVoiceRecording();
+    if (route !== "communication" && voiceRecorder?.state === "recording") stopVoiceRecording();
     BB.memoryJourney?.cancelView?.();
     updateHeader();
     const routes = {
@@ -109,7 +111,7 @@
     BB.store.save();
     if (route === "sensory") setupSensory();
     if (route === "nature") setupNature();
-    if (route === "parent" && parentUnlocked) refreshVoiceLibrary();
+    if (route === "communication" && communicationVoiceSetup) setTimeout(refreshVoiceLibrary,0);
     if (route === "memory") setTimeout(() => BB.memoryJourney.open(options.section || "hub",{withinRoute:true}),0);
     if (route === "mobile-tools") BB.mobileTools.afterRender();
     if (route === "home") pip("Hi, friend! What should we explore?", "😊", false);
@@ -134,11 +136,18 @@
     const recent = BB.store.data.recentWords.slice(0, 7);
     return `<section>
       ${BB.navigation.pageHead("My Communication Board", "Touch a card to say it. Put cards together to build a sentence.")}
+      <div class="communication-voice-bar"><div><strong>🎙️ Family Voice Cards</strong><small>Caregivers can record or upload the exact words shown on each card.</small></div><button class="${communicationVoiceSetup?"secondary-button":"primary-button"}" type="button" data-action="toggle-voice-setup">${communicationVoiceSetup?"Done recording":"Grown-up voice setup"}</button></div>
+      ${communicationVoiceSetup?`<div class="panel communication-voice-setup"><div class="voice-studio-intro"><span>💜</span><div><strong>Record the card exactly as written</strong><p>Tap Record beneath a card, say its word or phrase naturally, then tap Stop. The familiar voice will be used when that card is played.</p></div></div><div class="card-record-status"><span data-recording-status>Choose a card below to begin.</span><button class="danger-button" type="button" data-action="stop-voice-recording" hidden>■ Stop and save</button></div><div id="voice-library-list" class="voice-list"><p class="muted">Checking saved family voices…</p></div></div>`:""}
       <div class="sentence-builder"><label class="sr-only" for="aac-sentence">Communication sentence</label><textarea id="aac-sentence" class="sentence-text" rows="2" placeholder="Type or touch cards to build a sentence…" aria-label="Communication sentence. Type or add picture-card words here.">${escapeHtml(sentenceText)}</textarea><button class="compact-button" type="button" data-action="aac-clear" aria-label="Clear sentence">✕</button><button class="compact-button primary" type="button" data-action="aac-speak" aria-label="Speak exactly what is written in the sentence box">🔊 Say it</button></div>
       ${recent.length ? `<div class="recent-strip" aria-label="Recent words">${recent.map(word => `<button class="recent-word" type="button" data-aac-word="${escapeHtml(word)}">${escapeHtml(word)}</button>`).join("")}</div>` : ""}
       <div class="category-row">${categories.map(category => `<button class="category-chip ${category === aacCategory ? "active" : ""}" type="button" data-aac-category="${category}">${category}</button>`).join("")}</div>
-      <div class="button-grid">${items.length ? items.map(([word,icon]) => `<div class="big-tile aac-tile"><button class="favorite-star ${BB.store.data.favorites.includes(word) ? "is-favorite" : ""}" type="button" data-aac-favorite="${escapeHtml(word)}" aria-label="${BB.store.data.favorites.includes(word) ? "Remove" : "Add"} ${escapeHtml(word)} favorite">${BB.store.data.favorites.includes(word) ? "⭐" : "☆"}</button><button class="big-tile" type="button" data-aac-word="${escapeHtml(word)}"><span class="tile-icon">${icon}</span><span class="tile-label">${word}</span></button></div>`).join("") : `<div class="panel"><h3>Your favorites will grow here</h3><p>Tap the star on any communication card.</p></div>`}</div>
+      <div class="button-grid">${items.length ? items.map(([word,icon]) => `<div class="big-tile aac-tile ${communicationVoiceSetup?"voice-setup-card":""}"><button class="favorite-star ${BB.store.data.favorites.includes(word) ? "is-favorite" : ""}" type="button" data-aac-favorite="${escapeHtml(word)}" aria-label="${BB.store.data.favorites.includes(word) ? "Remove" : "Add"} ${escapeHtml(word)} favorite">${BB.store.data.favorites.includes(word) ? "⭐" : "☆"}</button><button class="big-tile" type="button" data-aac-word="${escapeHtml(word)}"><span class="tile-icon">${icon}</span><span class="tile-label">${word}</span></button>${communicationVoiceSetup?`<div class="aac-voice-actions"><button type="button" data-voice-card-record="${escapeHtml(word)}">🎙️ Record</button><label>⬆ Upload<input class="sr-only" type="file" accept="audio/*" data-voice-card-file="${escapeHtml(word)}"></label></div>`:""}</div>`).join("") : `<div class="panel"><h3>Your favorites will grow here</h3><p>Tap the star on any communication card.</p></div>`}</div>
     </section>`;
+  }
+
+  function refreshCommunicationView() {
+    view.innerHTML=renderCommunication();
+    if(communicationVoiceSetup)setTimeout(refreshVoiceLibrary,0);
   }
 
   function renderLearning() {
@@ -391,17 +400,7 @@
         <div class="flash-actions"><button class="secondary-button" type="button" data-memory-open="hub">Open Memory Home</button><button class="secondary-button" type="button" data-memory-encrypted-backup>Encrypted memory backup</button><label class="secondary-button">Restore encrypted backup<input class="sr-only" type="file" accept=".bbsecure,application/json" data-memory-encrypted-restore></label></div>
       </div>
       <div class="setting-group" style="margin-top:18px"><h3>👤 Child profiles</h3><label class="setting-row"><span><strong>Active profile</strong></span><select class="select" data-profile-select>${data.profiles.map(profile => `<option value="${profile.id}" ${profile.id === data.activeProfile ? "selected" : ""}>${profile.avatar} ${escapeHtml(profile.name)}</option>`).join("")}</select></label><label class="setting-row"><span><strong>Display name</strong><small>Shown on the home screen</small></span><input class="select" value="${escapeHtml(activeProfile.name)}" data-profile-name maxlength="30"></label><div class="setting-row"><button class="secondary-button" type="button" data-action="add-profile">Add child profile</button></div><label class="setting-row"><span><strong>Difficulty</strong></span><select class="select" data-setting-select="difficulty"><option value="starter" ${data.settings.difficulty === "starter" ? "selected" : ""}>Starter</option><option value="growing" ${data.settings.difficulty === "growing" ? "selected" : ""}>Growing</option><option value="adventure" ${data.settings.difficulty === "adventure" ? "selected" : ""}>Adventure</option></select></label></div>
-      <div class="setting-group voice-studio"><h3>🎙️ Family Voice Library</h3>
-        <div class="voice-studio-intro"><span>💜</span><div><strong>Let a familiar voice guide the way</strong><p>Type the exact word or phrase, then upload an audio clip or record it here. BrightBridge will play that family recording whenever the matching words appear.</p></div></div>
-        <div class="voice-form">
-          <label><span class="sr-only">Word or phrase</span><input class="voice-input" data-voice-label list="voice-phrase-suggestions" placeholder="Example: I want water" maxlength="160"></label>
-          <label><span class="sr-only">Choose family voice audio</span><input class="voice-input" data-voice-file type="file" accept="audio/*"></label>
-          <button class="primary-button" type="button" data-action="save-voice-upload">Upload voice</button>
-        </div>
-        <datalist id="voice-phrase-suggestions"><option value="I want water"><option value="I need help"><option value="More"><option value="All done"><option value="Yes"><option value="No"><option value="Great job!"><option value="Try again"></datalist>
-        <div class="record-controls"><button class="secondary-button" type="button" data-action="start-voice-recording">⏺ Record this phrase</button><button class="danger-button" type="button" data-action="stop-voice-recording" hidden>■ Stop and save</button><span data-recording-status class="muted">Recordings and uploads stay only on this device.</span></div>
-        <div id="voice-library-list" class="voice-list"><p class="muted">Loading family voice clips…</p></div>
-      </div>
+      <div class="setting-group voice-studio"><h3>🎙️ Family Voice Cards</h3><div class="setting-row"><span><strong>Recording now lives with the Communication cards</strong><small>Each recording is linked automatically to the exact card wording, preventing mismatched labels.</small></span><button class="secondary-button" type="button" data-route="communication">Open Communication</button></div></div>
       <div class="setting-group"><h3>📊 Favorite areas</h3>${Object.entries(data.activityVisits).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([name,count])=>`<div class="setting-row"><strong>${name}</strong><span style="margin-left:auto">${count} visits</span></div>`).join("") || '<div class="setting-row">No activity yet</div>'}</div>
       <div class="flash-actions"><button class="primary-button" type="button" data-action="export">Export progress JSON</button><button class="secondary-button" type="button" data-action="change-pin">Change PIN</button><button class="danger-button" type="button" data-action="reset">Reset all local data</button></div>
     </section>`;
@@ -414,6 +413,7 @@
 
   function closeModal() {
     modalRoot.innerHTML = "";
+    pinSuccess=null;
     BB.speech.stop();
   }
 
@@ -426,8 +426,9 @@
     modal(`<div class="modal-head"><h2>Five things around me</h2><button class="close-button" type="button" data-action="close-modal">×</button></div><div class="button-grid">${[["👀","5 things I see"],["🖐️","4 things I feel"],["👂","3 things I hear"],["👃","2 things I smell"],["💜","1 thing I like"]].map(([icon,text])=>`<button class="big-tile" type="button" data-grounding="${text}"><span class="tile-icon">${icon}</span>${text}</button>`).join("")}</div>`,"Grounding activity");
   }
 
-  function showPinModal() {
+  function showPinModal(onSuccess = null) {
     if (parentUnlocked || modalRoot.innerHTML) return;
+    pinSuccess=onSuccess;
     modal(`<div class="modal-head"><h2>Grown-up check</h2><button class="close-button" type="button" data-action="close-modal">×</button></div>
       <p><span class="pin-desktop-help">Enter the four-digit parent PIN.</span><span class="pin-mobile-help">Type the four-digit parent PIN or tap the number pad.</span></p>
       <input class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="4" data-pin-input aria-label="Parent PIN">
@@ -452,7 +453,14 @@
     const input=document.querySelector("[data-pin-input]");
     if(!input)return;
     if(input.value===BB.store.data.settings.parentPin){
-      parentUnlocked=true;closeModal();BB.navigation.go("parent",{replace:true});toast("Grown-up area unlocked");
+      parentUnlocked=true;
+      const success=pinSuccess;
+      pinSuccess=null;
+      modalRoot.innerHTML="";
+      BB.speech.stop();
+      if(success)success();
+      else BB.navigation.go("parent",{replace:true});
+      toast("Grown-up controls unlocked");
     }else{
       input.value="";updatePinDisplay();toast("That PIN did not match. Please try again.");input.focus();
     }
@@ -506,26 +514,26 @@
       : `<div class="panel"><strong>No family voice clips yet</strong><p>Start with frequently used words such as “Yes,” “No,” “Help,” and “I want water.”</p></div>`;
   }
 
-  async function saveVoiceUpload() {
-    const label = document.querySelector("[data-voice-label]")?.value.trim();
-    const file = document.querySelector("[data-voice-file]")?.files[0];
-    if (!label) { toast("Type the exact word or phrase first"); return; }
-    if (!file) { toast("Choose an audio file to upload"); return; }
-    if (!file.type.startsWith("audio/")) { toast("Please choose an audio recording"); return; }
-    if (file.size > 12 * 1024 * 1024) { toast("Please use an audio clip smaller than 12 MB"); return; }
-    try {
+  async function saveCardVoiceUpload(input) {
+    const label=input.dataset.voiceCardFile;
+    const file=input.files?.[0];
+    if(!file)return;
+    if(voiceRecorder?.state==="recording"){toast("Tap Stop and save before uploading another card.");input.value="";return;}
+    if(!file.type.startsWith("audio/")){toast("Please choose an audio recording");input.value="";return;}
+    if(file.size>12*1024*1024){toast("Please use an audio clip smaller than 12 MB");input.value="";return;}
+    try{
       await BB.voiceLibrary.save(label,file,"upload");
-      document.querySelector("[data-voice-file]").value = "";
+      input.value="";
       toast(`Family voice saved for “${label}”`);
       await refreshVoiceLibrary();
-    } catch {
+    }catch{
       toast("That voice clip could not be saved");
     }
   }
 
-  async function startVoiceRecording() {
-    const label = document.querySelector("[data-voice-label]")?.value.trim();
-    if (!label) { toast("Type the exact word or phrase before recording"); return; }
+  async function startVoiceRecording(labelOverride = "") {
+    const label = String(labelOverride || "").trim();
+    if (!label) { toast("Choose a Communication card before recording"); return; }
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       toast("Voice recording is not supported here. You can upload an audio file instead.");
       return;
@@ -548,15 +556,16 @@
         } catch {
           toast("That recording could not be saved");
         }
-        document.querySelector('[data-action="start-voice-recording"]')?.removeAttribute("hidden");
         document.querySelector('[data-action="stop-voice-recording"]')?.setAttribute("hidden","");
+        document.querySelectorAll("[data-voice-card-record]").forEach(button=>button.disabled=false);
         const status=document.querySelector("[data-recording-status]");
         if(status) status.textContent="Saved on this device.";
       });
       voiceRecorder.start();
-      document.querySelector('[data-action="start-voice-recording"]').setAttribute("hidden","");
-      document.querySelector('[data-action="stop-voice-recording"]').removeAttribute("hidden");
-      document.querySelector("[data-recording-status]").innerHTML='<i class="recording-light"></i> Recording… say the phrase naturally.';
+      document.querySelector('[data-action="stop-voice-recording"]')?.removeAttribute("hidden");
+      document.querySelectorAll("[data-voice-card-record]").forEach(button=>button.disabled=true);
+      const status=document.querySelector("[data-recording-status]");
+      if(status)status.innerHTML=`<i class="recording-light"></i> Recording “${escapeHtml(label)}”… say it naturally.`;
     } catch {
       toast("Microphone access was not available. You can upload a recording instead.");
     }
@@ -564,6 +573,22 @@
 
   function stopVoiceRecording() {
     if (voiceRecorder?.state === "recording") voiceRecorder.stop();
+  }
+
+  function toggleCommunicationVoiceSetup() {
+    if(communicationVoiceSetup){
+      if(voiceRecorder?.state==="recording")stopVoiceRecording();
+      communicationVoiceSetup=false;
+      view.innerHTML=renderCommunication();
+      return;
+    }
+    const activate=()=>{
+      communicationVoiceSetup=true;
+      BB.navigation.go("communication",{replace:true});
+      setTimeout(refreshVoiceLibrary,0);
+    };
+    if(parentUnlocked)activate();
+    else showPinModal(activate);
   }
 
   function toast(message) {
@@ -580,9 +605,19 @@
     const route = event.target.closest("[data-route]");
     if (route) { BB.navigation.go(route.dataset.route); return; }
     const category = event.target.closest("[data-aac-category]");
-    if (category) { aacCategory = category.dataset.aacCategory; view.innerHTML = renderCommunication(); return; }
+    if (category) {
+      if(voiceRecorder?.state==="recording"){toast("Tap Stop and save before changing card groups.");return;}
+      aacCategory = category.dataset.aacCategory; refreshCommunicationView(); return;
+    }
+    const voiceCardRecord=event.target.closest("[data-voice-card-record]");
+    if(voiceCardRecord){
+      if(voiceRecorder?.state==="recording")toast("Finish the current recording first.");
+      else startVoiceRecording(voiceCardRecord.dataset.voiceCardRecord);
+      return;
+    }
     const wordButton = event.target.closest("[data-aac-word]");
     if (wordButton) {
+      if(voiceRecorder?.state==="recording"){toast("Tap Stop and save before using another card.");return;}
       const word = wordButton.dataset.aacWord;
       sentenceText = sentenceText.trim() ? `${sentenceText.trim()} ${word}` : word;
       speakSaved(word);
@@ -590,12 +625,13 @@
       BB.store.data.recentWords = [word,...BB.store.data.recentWords.filter(item=>item!==word)].slice(0,12);
       BB.store.save();
       BB.memoryJourney?.track("communication","First communication card used",{icon:"⭐",detail:word,onceKey:"first-card"});
-      view.innerHTML = renderCommunication(); pip(word,"😊",false); return;
+      refreshCommunicationView(); pip(word,"😊",false); return;
     }
     const favorite = event.target.closest("[data-aac-favorite]");
     if (favorite) {
+      if(voiceRecorder?.state==="recording"){toast("Tap Stop and save before changing favorites.");return;}
       event.stopPropagation(); const word = favorite.dataset.aacFavorite; const list = BB.store.data.favorites;
-      if (list.includes(word)) list.splice(list.indexOf(word),1); else list.push(word); BB.store.save(); view.innerHTML = renderCommunication(); return;
+      if (list.includes(word)) list.splice(list.indexOf(word),1); else list.push(word); BB.store.save(); refreshCommunicationView(); return;
     }
     const openCards = event.target.closest("[data-open-cards]");
     if (openCards) { currentGame = BB.games[openCards.dataset.openCards]; flashIndex = 0; BB.navigation.go("flashcards",{game:currentGame.id}); BB.speech.speak(`${currentGame.cards[0].word}. ${currentGame.cards[0].detail}`); return; }
@@ -660,7 +696,8 @@
     const action = event.target.closest("[data-action]");
     if (!action) return;
     switch (action.dataset.action) {
-      case "aac-clear": sentenceText=""; view.innerHTML=renderCommunication(); break;
+      case "aac-clear": sentenceText=""; refreshCommunicationView(); break;
+      case "toggle-voice-setup": toggleCommunicationVoiceSetup();break;
       case "aac-speak": {const phrase=(document.querySelector("#aac-sentence")?.value || sentenceText).trim();sentenceText=phrase;if(phrase){speakSaved(phrase);BB.store.data.recentPhrases.unshift(phrase);BB.store.data.recentPhrases=BB.store.data.recentPhrases.slice(0,20);BB.store.save();BB.memoryJourney?.track("communication","First sentence created",{icon:"💬",detail:phrase,onceKey:"first-sentence"});pip(phrase,"😊",false);}else{pip("Write or choose some words first, then I can say them.","🙂");}} break;
       case "flash-prev": flashIndex=(flashIndex-1+currentGame.cards.length)%currentGame.cards.length;view.innerHTML=renderFlashcards({keepIndex:true});BB.speech.speak(`${currentGame.cards[flashIndex].word}. ${currentGame.cards[flashIndex].detail}`);break;
       case "flash-next": flashIndex=(flashIndex+1)%currentGame.cards.length;view.innerHTML=renderFlashcards({keepIndex:true});BB.speech.speak(`${currentGame.cards[flashIndex].word}. ${currentGame.cards[flashIndex].detail}`);break;
@@ -677,8 +714,6 @@
       case "change-pin": modal(`<div class="modal-head"><h2>Change parent PIN</h2><button class="close-button" type="button" data-action="close-modal">×</button></div><input class="select" style="width:100%" type="password" inputmode="numeric" maxlength="4" data-new-pin placeholder="New 4-digit PIN"><button class="primary-button" type="button" data-action="save-pin">Save PIN</button>`,"Change parent PIN");break;
       case "add-profile": modal(`<div class="modal-head"><h2>Add child profile</h2><button class="close-button" type="button" data-action="close-modal">×</button></div><label class="setting-row"><span><strong>Name</strong></span><input class="select" data-new-profile-name maxlength="30" placeholder="Explorer name"></label><label class="setting-row"><span><strong>Avatar</strong></span><select class="select" data-new-profile-avatar><option>🌟</option><option>🦋</option><option>🐳</option><option>🌈</option><option>🚀</option></select></label><button class="primary-button" type="button" data-action="save-profile">Add profile</button>`,"Add child profile");break;
       case "save-profile": {const name=document.querySelector("[data-new-profile-name]").value.trim();if(!name){toast("Please add a name");break;}const id=`child-${Date.now()}`;BB.store.data.profiles.push({id,name,avatar:document.querySelector("[data-new-profile-avatar]").value});BB.store.data.activeProfile=id;BB.store.save();closeModal();BB.navigation.go("parent",{replace:true});toast("Profile added");}break;
-      case "save-voice-upload": saveVoiceUpload();break;
-      case "start-voice-recording": startVoiceRecording();break;
       case "stop-voice-recording": stopVoiceRecording();break;
       case "save-pin": {const pin=document.querySelector("[data-new-pin]").value;if(/^\d{4}$/.test(pin)){BB.store.data.settings.parentPin=pin;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers");}break;
       case "export": downloadExport();break;
@@ -701,6 +736,7 @@
 
   document.addEventListener("click",handleClick);
   document.addEventListener("input",handleInput);
+  document.addEventListener("change",event=>{if(event.target.matches("[data-voice-card-file]"))saveCardVoiceUpload(event.target);});
   document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal();});
   document.addEventListener("keydown",event=>{if(event.key==="Enter"&&event.target.matches("[data-pin-input]"))verifyParentPin();});
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;document.querySelector('[data-action="install"]').hidden=false;});
