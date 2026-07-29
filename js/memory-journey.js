@@ -151,7 +151,8 @@
       BB.navigation.go("parent");
       return;
     }
-    if (BB.navigation.current !== "memory" && !options.withinRoute) {
+    if (BB.navigation.current !== "memory") {
+      if (options.withinRoute) return;
       BB.navigation.go("memory",{section:next});
       return;
     }

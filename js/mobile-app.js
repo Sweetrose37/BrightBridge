@@ -121,7 +121,7 @@
     BB.store.save();
     if(route==="communication"&&voiceSetup)setTimeout(refreshVoiceList,0);
     if(route==="calm")setupSensory();
-    if(route==="memory")setTimeout(()=>BB.memoryJourney.open(options.section||"hub",{withinRoute:true}),0);
+    if(route==="memory")BB.memoryJourney.open(options.section||"hub",{withinRoute:true});
   }
 
   function renderHome(){

@@ -19,7 +19,7 @@
       <div class="mark">B</div>
       <h1>Refreshing BrightBridge</h1>
       <p id="status">Getting the newest mobile version…</p>
-      <a id="continue" href="./?fresh=15" hidden>Open BrightBridge</a>
+      <a id="continue" href="./?fresh=16" hidden>Open BrightBridge</a>
     </main>
     <script>
       (async function () {
@@ -35,7 +35,7 @@
         } finally {
           document.querySelector("#status").textContent = "The newest version is ready. Your saved progress was kept.";
           document.querySelector("#continue").hidden = false;
-          setTimeout(() => location.replace("./?fresh=15"), 900);
+          setTimeout(() => location.replace("./?fresh=16"), 900);
         }
       })();
     </script>
