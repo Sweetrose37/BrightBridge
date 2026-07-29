@@ -356,6 +356,13 @@
   const learningIds=["alphabet","phonics","numbers","counting","colors","shapes","patterns","animals","food","naturelearn","vehicles","weather","bodyparts","helpers","sorting","matching","tracing","memorygame","puzzles","emotions","lifeskills","employment","community","money","advocacy","wellness"];
   const aac={
     Quick:[["I want","☝️"],["I need","🙋"],["More","➕"],["All done","✅"],["Yes","👍"],["No","👎"],["Please","💜"],["Thank you","🌟"]],
+    "Core Words":[["I","🙋"],["You","👉"],["I want","☝️"],["I need","🙋"],["I like","💜"],["I don't like","🙅"],["More","➕"],["Different","🔄"],["Finished","✅"],["Yes","👍"],["No","👎"],["Please","🙏"]],
+    Questions:[["What?","❓"],["Where?","📍"],["When?","🕐"],["Why?","🤔"],["Who?","👤"],["Can you help?","🆘"],["Can you repeat that?","🔁"],["What happens next?","➡️"]],
+    "Sensory Needs":[["Too bright","☀️"],["Too loud","🔇"],["Too crowded","👥"],["Quiet please","🤫"],["I need headphones","🎧"],["I need pressure","🤗"],["I need movement","🏃"],["I need a sensory break","🌈"]],
+    "Body & Pain":[["My head hurts","🤕"],["My stomach hurts","🤢"],["My throat hurts","🗣️"],["My tooth hurts","🦷"],["It is itchy","🖐️"],["I feel dizzy","💫"],["I feel sick","🤒"],["Small pain","1️⃣"],["Medium pain","2️⃣"],["Big pain","3️⃣"]],
+    "Consent & Safety":[["Stop","✋"],["Don't touch me","🛑"],["I need space","↔️"],["I don't feel safe","⚠️"],["I need a trusted adult","🧑‍🤝‍🧑"],["Please move back","⬅️"],["I do not consent","🚫"],["Call my caregiver","📞"]],
+    Regulation:[["I am overwhelmed","🌊"],["I am frustrated","😣"],["I am confused","😕"],["I am worried","😟"],["I need time","⏳"],["I need quiet","🤫"],["I need to move","🏃"],["I am ready","✅"]],
+    Conversation:[["Hello","👋"],["Goodbye","👋"],["My name is","🏷️"],["How are you?","😊"],["I agree","👍"],["I disagree","👎"],["Tell me more","💬"],["I want to talk about","🗨️"]],
     Food:[["Apple","🍎"],["Banana","🍌"],["Sandwich","🥪"],["Crackers","🍘"],["Yogurt","🥣"],["Hungry","😋"]],
     Drinks:[["Water","💧"],["Milk","🥛"],["Juice","🧃"],["Thirsty","😮"],["Cup","🥤"]],
     Bathroom:[["Bathroom","🚻"],["Toilet","🚽"],["Wash hands","🧼"],["Help please","🙋"],["Wet","💦"]],
@@ -363,10 +370,14 @@
     Feelings:[["Happy","😊"],["Sad","😢"],["Angry","😠"],["Calm","😌"],["Scared","😨"],["Tired","😴"],["Excited","🤩"]],
     Family:[["Mom","👩"],["Dad","👨"],["Grandma","👵"],["Grandpa","👴"],["Brother","👦"],["Sister","👧"],["Home","🏠"]],
     Animals:[["Dog","🐶"],["Cat","🐱"],["Bird","🐦"],["Fish","🐠"],["Horse","🐴"],["Animal","🐾"]],
-    School:[["Teacher","🧑‍🏫"],["School","🏫"],["Book","📖"],["Pencil","✏️"],["Friend","🧑‍🤝‍🧑"],["My turn","☝️"]],
+    School:[["Teacher","🧑‍🏫"],["School","🏫"],["Book","📖"],["Pencil","✏️"],["Friend","🧑‍🤝‍🧑"],["My turn","☝️"],["I have a question","❓"],["Repeat please","🔁"],["I need more time","⏳"],["I understand","💡"],["I don't understand","🤔"],["I need help","🆘"],["I need a break","⏸️"],["I finished my work","✅"]],
     Medical:[["Doctor","🩺"],["Medicine","💊"],["My head hurts","🤕"],["My tummy hurts","🤢"],["Bandage","🩹"],["Emergency","🚑"]],
-    Transportation:[["Car","🚗"],["Bus","🚌"],["Train","🚆"],["Bike","🚲"],["Go","🟢"],["Stop","🛑"]]
+    Transportation:[["Car","🚗"],["Bus","🚌"],["Train","🚆"],["Bike","🚲"],["Go","🟢"],["Stop","🛑"]],
+    "Daily Routines":[["Get dressed","👕"],["Take a shower","🚿"],["Brush teeth","🪥"],["Take medicine","💊"],["Eat","🍽️"],["Clean up","🧹"],["Bedtime","🛏️"],["Morning routine","🌅"]],
+    "Places & People":[["Home","🏠"],["School","🏫"],["Store","🛒"],["Doctor","🩺"],["Bathroom","🚻"],["Family","👪"],["Teacher","🧑‍🏫"],["Trusted adult","🧑‍🤝‍🧑"]],
+    Independence:[["I need transportation","🚌"],["How much does it cost?","💵"],["I have an appointment","📅"],["I need an accommodation","♿"],["I can decide","✅"],["I need help with work","💼"],["I need directions","🧭"],["My goal is","🎯"]]
   };
+  const quickTalk=[["Help","🆘"],["Stop","✋"],["Yes","👍"],["No","👎"],["Bathroom","🚻"],["Break","⏸️"],["It hurts","🩹"],["All done","✅"]];
   const spanishWords={"I want":"Quiero","I need":"Necesito","More":"Más","All done":"Terminé","Yes":"Sí","No":"No","Please":"Por favor","Thank you":"Gracias","Apple":"Manzana","Banana":"Plátano","Sandwich":"Sándwich","Crackers":"Galletas","Yogurt":"Yogur","Hungry":"Tengo hambre","Water":"Agua","Milk":"Leche","Juice":"Jugo","Thirsty":"Tengo sed","Cup":"Vaso","Bathroom":"Baño","Toilet":"Inodoro","Wash hands":"Lavar las manos","Help please":"Ayuda, por favor","Wet":"Mojado","Help":"Ayuda","Stop":"Alto","Break":"Descanso","Too loud":"Demasiado fuerte","It hurts":"Me duele","I don't know":"No sé","Happy":"Feliz","Sad":"Triste","Angry":"Enojado","Calm":"Tranquilo","Scared":"Asustado","Tired":"Cansado","Excited":"Emocionado","Mom":"Mamá","Dad":"Papá","Grandma":"Abuela","Grandpa":"Abuelo","Brother":"Hermano","Sister":"Hermana","Home":"Casa","Dog":"Perro","Cat":"Gato","Bird":"Pájaro","Fish":"Pez","Horse":"Caballo","Animal":"Animal","Teacher":"Maestro","School":"Escuela","Book":"Libro","Pencil":"Lápiz","Friend":"Amigo","My turn":"Mi turno","Doctor":"Doctor","Medicine":"Medicina","My head hurts":"Me duele la cabeza","My tummy hurts":"Me duele el estómago","Bandage":"Venda","Emergency":"Emergencia","Car":"Carro","Bus":"Autobús","Train":"Tren","Bike":"Bicicleta","Go":"Ir","Again please":"Otra vez, por favor","Look with me":"Mira conmigo","My favorite":"Mi favorito","I can read":"Puedo leer","What comes next?":"¿Qué sigue?","I need a schedule":"Necesito un horario","I have a goal":"Tengo una meta","I need more time":"Necesito más tiempo","Can you explain?":"¿Puedes explicar?","I can speak up for myself":"Puedo defenderme","I need transportation":"Necesito transporte","My future goal":"Mi meta futura"};
   const feelings=[["Happy","😊","I feel bright and happy."],["Sad","😢","I may want comfort."],["Angry","😠","I can pause and breathe."],["Calm","😌","My body feels quiet."],["Scared","😨","I can find a safe grown-up."],["Tired","😴","My body may need rest."],["Excited","🤩","I have lots of happy energy."],["Frustrated","😣","I can take a break and try later."]];
   const settingsRows={
@@ -390,6 +401,10 @@
   let sentence="";
   let category="Quick";
   let voiceSetup=false;
+  let customCards=[];
+  let customLoadedProfile="";
+  let customPhotoUrls=[];
+  let customDbPromise=null;
   let recorder=null;
   let stream=null;
   let chunks=[];
@@ -420,6 +435,115 @@
   function activeProfile(){
     const data=BB.store.data;
     return data.profiles.find(profile=>profile.id===data.activeProfile)||data.profiles[0];
+  }
+
+  function customDatabase(){
+    if(customDbPromise)return customDbPromise;
+    customDbPromise=new Promise((resolve,reject)=>{
+      if(!window.indexedDB){reject(new Error("Private card storage is unavailable."));return;}
+      const request=indexedDB.open("brightbridge-mobile-custom-aac",1);
+      const timer=setTimeout(()=>reject(new Error("Private card storage timed out.")),2500);
+      request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains("cards"))db.createObjectStore("cards",{keyPath:"id"});};
+      request.onsuccess=()=>{clearTimeout(timer);resolve(request.result);};
+      request.onerror=()=>{clearTimeout(timer);reject(request.error);};
+      request.onblocked=()=>{clearTimeout(timer);reject(new Error("Close another BrightBridge tab and try again."));};
+    }).catch(error=>{customDbPromise=null;throw error;});
+    return customDbPromise;
+  }
+
+  async function customStore(mode,work){
+    const db=await customDatabase();
+    return new Promise((resolve,reject)=>{
+      const transaction=db.transaction("cards",mode),store=transaction.objectStore("cards");
+      let request;
+      try{request=work(store);}catch(error){reject(error);return;}
+      transaction.oncomplete=()=>resolve(request?.result);
+      transaction.onerror=()=>reject(transaction.error);
+      transaction.onabort=()=>reject(transaction.error||new Error("The custom card change was stopped."));
+    });
+  }
+
+  function releaseCustomPhotos(){
+    customPhotoUrls.forEach(url=>URL.revokeObjectURL(url));
+    customPhotoUrls=[];
+  }
+
+  async function loadCustomCards(force=false){
+    const profileId=activeProfile().id;
+    if(!force&&customLoadedProfile===profileId)return;
+    try{
+      const records=await customStore("readonly",store=>store.getAll());
+      releaseCustomPhotos();
+      customCards=(records||[]).filter(item=>item.profileId===profileId).sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0)).map(item=>{
+        if(!item.photo)return item;
+        const photoUrl=URL.createObjectURL(item.photo);customPhotoUrls.push(photoUrl);return {...item,photoUrl};
+      });
+      customLoadedProfile=profileId;
+      if(route==="communication"){view.innerHTML=renderCommunication();if(voiceSetup)setTimeout(refreshVoiceList,0);}
+    }catch{toast("Custom cards could not be opened on this device.");}
+  }
+
+  async function saveCustomCard(card){
+    await customStore("readwrite",store=>store.put(card));
+    customLoadedProfile="";
+    await loadCustomCards(true);
+  }
+
+  async function removeCustomCard(id){
+    await customStore("readwrite",store=>store.delete(id));
+    customLoadedProfile="";
+    await loadCustomCards(true);
+  }
+
+  async function clearCustomCards(){
+    try{await customStore("readwrite",store=>store.clear());}catch{}
+    releaseCustomPhotos();customCards=[];customLoadedProfile="";
+  }
+
+  async function updateCustomOrder(id,direction){
+    const ordered=[...customCards].sort((a,b)=>(a.order||0)-(b.order||0));
+    const index=ordered.findIndex(item=>item.id===id),swapIndex=index+direction;
+    if(index<0||swapIndex<0||swapIndex>=ordered.length)return;
+    const first=ordered[index],second=ordered[swapIndex],firstOrder=first.order||index,secondOrder=second.order||swapIndex;
+    const {photoUrl:firstUrl,...firstStored}=first,{photoUrl:secondUrl,...secondStored}=second;
+    await Promise.all([
+      customStore("readwrite",store=>store.put({...firstStored,order:secondOrder})),
+      customStore("readwrite",store=>store.put({...secondStored,order:firstOrder}))
+    ]);
+    customLoadedProfile="";
+    await loadCustomCards(true);
+  }
+
+  function emergencyItems(){
+    const profile=activeProfile(),items=[
+      [`My name is ${profile.name}`,"🏷️"],
+      ["Emergency help","🚨"],["Call 911","📞"],["I am lost","🧭"],["I need medical help","🚑"],
+      ["I cannot speak","💬"],["Please read my cards","📱"]
+    ];
+    if(profile.caregiverPhone)items.splice(1,0,[`Call my caregiver at ${profile.caregiverPhone}`,"📞"]);
+    if(profile.address)items.splice(2,0,[`My address is ${profile.address}`,"🏠"]);
+    if(profile.allergies)items.splice(3,0,[`My allergies are ${profile.allergies}`,"⚠️"]);
+    return items;
+  }
+
+  function visibleCustomItems(){
+    return customCards.filter(item=>!item.hidden).map(item=>[item.label,item.icon||"💬",item.photoUrl||"",item.id]);
+  }
+
+  async function addCustomCard(){
+    const label=document.querySelector("[data-custom-label]")?.value.trim();
+    const cardCategory=document.querySelector("[data-custom-category]")?.value.trim()||"Custom";
+    const icon=document.querySelector("[data-custom-icon]")?.value.trim()||"💬";
+    const photo=document.querySelector("[data-custom-photo]")?.files?.[0]||null;
+    if(!label){toast("Write the words for this card first.");return;}
+    if(photo&&(!photo.type.startsWith("image/")||photo.size>5*1024*1024)){toast("Choose an image smaller than 5 MB.");return;}
+    const id=crypto.randomUUID?.()||`custom-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const order=customCards.reduce((highest,item)=>Math.max(highest,Number(item.order)||0),0)+1;
+    try{
+      category=cardCategory.slice(0,30);
+      await saveCustomCard({id,profileId:activeProfile().id,label:label.slice(0,80),category:cardCategory.slice(0,30),icon:icon.slice(0,8),photo,hidden:false,order,createdAt:Date.now()});
+      toast(`Custom card saved for “${label}”`);
+    }catch{toast("That custom card could not be saved.");}
   }
 
   function updateHeader(){
@@ -488,7 +612,10 @@
     view.innerHTML=(screens[route]||renderHome)();
     BB.store.data.activityVisits[route]=(BB.store.data.activityVisits[route]||0)+1;
     BB.store.save();
-    if(route==="communication"&&voiceSetup)setTimeout(refreshVoiceList,0);
+    if(route==="communication"){
+      if(voiceSetup)setTimeout(refreshVoiceList,0);
+      if(customLoadedProfile!==activeProfile().id)setTimeout(()=>loadCustomCards(),0);
+    }
     if(route==="calm")setupSensory();
     if(route==="flashcards"&&currentGame?.id==="tracing")setupTracing();
     if(route==="tools")BB.mobileTools.afterRender();
@@ -508,7 +635,7 @@
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
-      <div class="mobile-whats-new"><div><span>✨ MOBILE 24</span><h2>New & restored</h2><p>Your tools are ready on this home screen.</p></div><div class="mobile-quick-grid"><button type="button" data-route="tools"><span>🧰</span><strong>My Tools</strong><small>Schedules, choices & photos</small></button><button type="button" data-route="learning"><span>📚</span><strong>26 Learning Activities</strong><small>Phonics through life skills</small></button><button type="button" data-route="calm"><span>🌈</span><strong>10 Sensory Worlds</strong><small>Draw, ripple, float & glow</small></button><button type="button" data-route="parent"><span>🔒</span><strong>Memories & Growth</strong><small>PIN-protected caregiver area</small></button></div></div>
+      <div class="mobile-whats-new"><div><span>✨ MOBILE 25</span><h2>More ways to communicate</h2><p>Quick Talk, expanded conversation packs, and private custom cards are ready.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Quick Talk & Card Packs</strong><small>Safety, sensory, school & more</small></button><button type="button" data-route="tools"><span>🧰</span><strong>My Tools</strong><small>Schedules, choices & photos</small></button><button type="button" data-route="calm"><span>🌈</span><strong>10 Sensory Worlds</strong><small>Draw, ripple, float & glow</small></button><button type="button" data-route="parent"><span>🔒</span><strong>Memories & Growth</strong><small>PIN-protected caregiver area</small></button></div></div>
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
@@ -516,24 +643,57 @@
 
   function communicationItems(){
     const growthWords=BB.memoryJourney?.stageVocabulary?.()||[];
+    const custom=visibleCustomItems(),all=[...Object.values(aac).flat(),...emergencyItems(),...growthWords,...custom];
     let items;
-    if(category==="Favorites")items=[...Object.values(aac).flat(),...growthWords].filter(([word])=>BB.store.data.favorites.includes(word)||BB.store.data.favorites.includes(spanishWords[word]));
-    else if(category==="Recent"){const all=[...Object.values(aac).flat(),...growthWords];items=BB.store.data.recentWords.map(word=>all.find(item=>item[0]===word||spanishWords[item[0]]===word)||[word,"💬"]);}
+    if(category==="Favorites")items=all.filter(([word])=>BB.store.data.favorites.includes(word)||BB.store.data.favorites.includes(spanishWords[word]));
+    else if(category==="Recent")items=BB.store.data.recentWords.map(word=>all.find(item=>item[0]===word||spanishWords[item[0]]===word)||[word,"💬"]);
     else if(category==="Growth Path")items=growthWords;
-    else items=aac[category]||aac.Quick;
-    return BB.store.data.settings.language==="es-US"?items.map(([word,icon])=>[spanishWords[word]||word,icon]):items;
+    else if(category==="Emergency")items=emergencyItems();
+    else{
+      const customInCategory=customCards.filter(item=>!item.hidden&&(item.category||"Custom")===category).map(item=>[item.label,item.icon||"💬",item.photoUrl||"",item.id]);
+      items=[...(aac[category]||[]),...customInCategory];
+      if(!items.length)items=aac.Quick;
+    }
+    return BB.store.data.settings.language==="es-US"?items.map(([word,icon,photo,id])=>[spanishWords[word]||word,icon,photo,id]):items;
+  }
+
+  function renderCustomManager(){
+    const rows=customCards.map((item,index)=>`<div class="mobile-custom-row ${item.hidden?"is-hidden":""}">
+      <span class="mobile-custom-preview">${item.photoUrl?`<img src="${item.photoUrl}" alt="">`:esc(item.icon||"💬")}</span>
+      <div><strong>${esc(item.label)}</strong><small>${esc(item.category||"Custom")}${item.hidden?" · hidden":""}</small></div>
+      <div class="mobile-custom-actions">
+        <button type="button" data-custom-move="${esc(item.id)}" data-direction="-1" aria-label="Move ${esc(item.label)} up" ${index===0?"disabled":""}>↑</button>
+        <button type="button" data-custom-move="${esc(item.id)}" data-direction="1" aria-label="Move ${esc(item.label)} down" ${index===customCards.length-1?"disabled":""}>↓</button>
+        <button type="button" data-custom-hide="${esc(item.id)}" aria-label="${item.hidden?"Show":"Hide"} ${esc(item.label)}">${item.hidden?"👁":"🙈"}</button>
+        <button type="button" data-custom-delete="${esc(item.id)}" aria-label="Delete ${esc(item.label)}">🗑️</button>
+      </div>
+    </div>`).join("");
+    return `<div class="mobile-custom-manager">
+      <h3>✨ Custom Conversation Cards</h3>
+      <p>Add a familiar phrase, emoji or personal photo. After saving, open its category below to record the matching family voice.</p>
+      <div class="mobile-custom-form">
+        <label><span>Words on card</span><input data-custom-label maxlength="80" placeholder="Example: I want my blue cup"></label>
+        <label><span>Category</span><input data-custom-category maxlength="30" value="Custom" placeholder="Custom"></label>
+        <label><span>Emoji or icon</span><input data-custom-icon maxlength="8" value="💬" aria-label="Card emoji"></label>
+        <label><span>Personal photo (optional)</span><input type="file" accept="image/*" data-custom-photo></label>
+        <button class="mobile-button mobile-wide-button" type="button" data-action="custom-add">Save custom card</button>
+      </div>
+      <div class="mobile-custom-list">${rows||'<p class="muted">No custom cards yet.</p>'}</div>
+    </div>`;
   }
 
   function renderCommunication(){
     const items=communicationItems();
-    const categories=[...Object.keys(aac),"Growth Path","Favorites","Recent"];
+    const customCategories=[...new Set(customCards.filter(item=>!item.hidden).map(item=>item.category||"Custom"))];
+    const categories=[...new Set([...Object.keys(aac),"Emergency",...customCategories,"Growth Path","Favorites","Recent"])];
     return `<section>
       ${pageHead("Communication","Tap cards to build the sentence exactly as written.")}
       <div class="mobile-voice-banner"><div><strong>🎙️ Family Voice Cards</strong><small>Caregivers record directly on the matching card.</small></div><button type="button" data-action="voice-setup">${voiceSetup?"Done":"Set up"}</button></div>
-      ${voiceSetup?`<div class="mobile-panel"><h3>Private caregiver recording mode</h3><p>Record or upload the exact word shown on each card. Recordings stay on this device.</p><div id="voice-list" class="voice-list"><p class="muted">Checking saved voices…</p></div></div><div class="mobile-recording"><span data-record-status>Choose a card to record.</span><button type="button" data-action="record-stop" hidden>■ Stop & save</button></div>`:""}
+      ${voiceSetup?`<div class="mobile-panel"><h3>Private caregiver recording mode</h3><p>Record or upload the exact words shown on each card. Recordings stay on this device.</p><div id="voice-list" class="voice-list"><p class="muted">Checking saved voices…</p></div>${renderCustomManager()}</div><div class="mobile-recording"><span data-record-status>Choose a card to record.</span><button type="button" data-action="record-stop" hidden>■ Stop & save</button></div>`:""}
       <div class="mobile-sentence"><textarea rows="2" data-sentence aria-label="Communication sentence" placeholder="Your sentence…">${esc(sentence)}</textarea><div class="mobile-sentence-actions"><button type="button" data-action="sentence-clear" aria-label="Clear">✕</button><button type="button" data-action="sentence-speak" aria-label="Play the exact sentence">🔊</button></div></div>
+      <div class="mobile-quick-talk" aria-label="Quick Talk"><strong>Quick Talk</strong><div>${quickTalk.map(([word,icon])=>{const shown=BB.store.data.settings.language==="es-US"?(spanishWords[word]||word):word;return `<button type="button" data-word="${esc(shown)}"><span>${icon}</span>${esc(shown)}</button>`;}).join("")}</div></div>
       <div class="mobile-category-row">${categories.map(name=>`<button class="mobile-chip ${category===name?"active":""}" type="button" data-category="${esc(name)}">${esc(name)}</button>`).join("")}</div>
-      <div class="mobile-aac-grid">${items.length?items.map(([word,icon])=>`<article class="mobile-aac-card"><button class="mobile-favorite" type="button" data-favorite="${esc(word)}" aria-label="Favorite ${esc(word)}">${BB.store.data.favorites.includes(word)?"⭐":"☆"}</button><button class="mobile-aac-say" type="button" data-word="${esc(word)}"><span class="icon">${icon}</span><strong>${esc(word)}</strong></button>${voiceSetup?`<div class="mobile-voice-actions"><button type="button" data-record-card="${esc(word)}">🎙️ Record</button><label>⬆ Upload<input class="sr-only" type="file" accept="audio/*" data-upload-card="${esc(word)}"></label></div>`:""}</article>`).join(""):`<div class="mobile-panel"><h3>No favorites yet</h3><p>Tap ☆ on a card to add it here.</p></div>`}</div>
+      <div class="mobile-aac-grid">${items.length?items.map(([word,icon,photo])=>`<article class="mobile-aac-card"><button class="mobile-favorite" type="button" data-favorite="${esc(word)}" aria-label="Favorite ${esc(word)}">${BB.store.data.favorites.includes(word)?"⭐":"☆"}</button><button class="mobile-aac-say" type="button" data-word="${esc(word)}">${photo?`<img class="mobile-aac-photo" src="${photo}" alt="">`:`<span class="icon">${icon}</span>`}<strong>${esc(word)}</strong></button>${voiceSetup?`<div class="mobile-voice-actions"><button type="button" data-record-card="${esc(word)}">🎙️ Record</button><label>⬆ Upload<input class="sr-only" type="file" accept="audio/*" data-upload-card="${esc(word)}"></label></div>`:""}</article>`).join(""):`<div class="mobile-panel"><h3>No cards here yet</h3><p>Add a custom card or choose another category.</p></div>`}</div>
     </section>`;
   }
 
@@ -658,6 +818,12 @@
         <label class="mobile-setting-row"><span><strong>Active profile</strong></span><select data-profile>${data.profiles.map(item=>`<option value="${esc(item.id)}" ${item.id===data.activeProfile?"selected":""}>${item.avatar} ${esc(item.name)}</option>`).join("")}</select></label>
         <label class="mobile-setting-row"><span><strong>Display name</strong></span><input data-profile-name value="${esc(profile.name)}" maxlength="30"></label>
         <label class="mobile-setting-row"><span><strong>Birthday</strong><small>Used only for caregiver-controlled celebrations and age suggestions</small></span><input type="date" data-profile-birthday value="${esc(profile.birthDate||"")}"></label>
+        <details class="mobile-profile-emergency"><summary>Emergency card details (optional)</summary>
+          <label><span>Caregiver phone</span><input type="tel" data-profile-detail="caregiverPhone" value="${esc(profile.caregiverPhone||"")}" maxlength="30" placeholder="Phone number"></label>
+          <label><span>Home address</span><textarea data-profile-detail="address" maxlength="160" placeholder="Address shown only on this device">${esc(profile.address||"")}</textarea></label>
+          <label><span>Allergies or critical note</span><textarea data-profile-detail="allergies" maxlength="160" placeholder="Example: Allergy to peanuts">${esc(profile.allergies||"")}</textarea></label>
+          <small>These details create private, profile-aware Emergency cards. Add only what you want the child to be able to show or play.</small>
+        </details>
       </div>
       <div class="mobile-profile-actions"><button class="mobile-button secondary" type="button" data-action="add-profile"><span>➕</span><strong>Add another profile</strong><small>Create a separate private journey</small></button><button class="mobile-button secondary" type="button" data-route="communication"><span>🎙️</span><strong>Family Voice Cards</strong><small>Record beside exact communication cards</small></button></div>
       <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button><button class="mobile-button secondary" type="button" data-action="export">⬇ Export progress</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
@@ -827,6 +993,12 @@
     if(word){if(recorder?.state==="recording"){toast("Stop and save before using another card.");return;}const value=word.dataset.word;sentence=sentence.trim()?`${sentence.trim()} ${value}`:value;speakExact(value);BB.store.data.wordUse[value]=(BB.store.data.wordUse[value]||0)+1;BB.store.data.recentWords=[value,...BB.store.data.recentWords.filter(item=>item!==value)].slice(0,12);BB.store.save();BB.memoryJourney?.track("communication","First communication card used",{icon:"⭐",detail:value,onceKey:"first-card"});refreshCommunication();pip(value,"😊");return;}
     const favorite=event.target.closest("[data-favorite]");
     if(favorite){if(recorder?.state==="recording"){toast("Stop and save before changing favorites.");return;}const value=favorite.dataset.favorite,list=BB.store.data.favorites;list.includes(value)?list.splice(list.indexOf(value),1):list.push(value);BB.store.save();refreshCommunication();return;}
+    const customMove=event.target.closest("[data-custom-move]");
+    if(customMove){customMove.disabled=true;updateCustomOrder(customMove.dataset.customMove,Number(customMove.dataset.direction)).catch(()=>toast("That card could not be moved."));return;}
+    const customHide=event.target.closest("[data-custom-hide]");
+    if(customHide){const item=customCards.find(card=>card.id===customHide.dataset.customHide);if(item){const {photoUrl,...stored}=item;saveCustomCard({...stored,hidden:!item.hidden}).then(()=>toast(item.hidden?"Card shown":"Card hidden")).catch(()=>toast("That card could not be changed."));}return;}
+    const customDelete=event.target.closest("[data-custom-delete]");
+    if(customDelete){const item=customCards.find(card=>card.id===customDelete.dataset.customDelete);if(item&&confirm(`Delete the custom card “${item.label}”? Its family voice recording is managed separately.`))removeCustomCard(item.id).then(()=>toast("Custom card deleted")).catch(()=>toast("That card could not be deleted."));return;}
     const record=event.target.closest("[data-record-card]");if(record){startRecording(record.dataset.recordCard);return;}
     const voicePlay=event.target.closest("[data-voice-play]");if(voicePlay){BB.voiceLibrary.play(voicePlay.dataset.voicePlay,BB.store.data.settings.speechVolume);return;}
     const voiceDelete=event.target.closest("[data-voice-delete]");if(voiceDelete){if(confirm("Delete this family voice recording?"))BB.voiceLibrary.remove(voiceDelete.dataset.voiceDelete).then(()=>{toast("Voice deleted");refreshVoiceList();});return;}
@@ -846,6 +1018,7 @@
     switch(action.dataset.action){
       case "repeat-pip":BB.speech.repeat();break;
       case "voice-setup":toggleVoiceSetup();break;
+      case "custom-add":addCustomCard();break;
       case "record-stop":stopRecording();break;
       case "sentence-clear":sentence="";refreshCommunication();break;
       case "sentence-speak":{const value=(document.querySelector("[data-sentence]")?.value||sentence).trim();sentence=value;if(value){speakExact(value);BB.store.data.recentPhrases.unshift(value);BB.store.data.recentPhrases=BB.store.data.recentPhrases.slice(0,20);BB.store.save();BB.memoryJourney?.track("communication","First sentence created",{icon:"💬",detail:value,onceKey:"first-sentence"});pip(value,"😊");}else toast("Add words to the sentence first.");break;}
@@ -867,7 +1040,7 @@
       case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();go("parent",{replace:true});break;}
       case "delete-profile":{if(BB.store.data.profiles.length<2)break;if(confirm(`Delete ${activeProfile().name}'s profile? Private recordings must be deleted separately.`)){BB.store.data.profiles=BB.store.data.profiles.filter(item=>item.id!==BB.store.data.activeProfile);BB.store.data.activeProfile=BB.store.data.profiles[0].id;BB.store.save();go("parent",{replace:true});}break;}
       case "export":exportProgress();break;
-      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear()]).finally(()=>{BB.store.reset();parentUnlocked=false;go("home");});break;
+      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear(),clearCustomCards()]).finally(()=>{BB.store.reset();parentUnlocked=false;go("home");});break;
       case "close-modal":closeModal();break;
       case "modal-overlay":if(event.target===action)closeModal();break;
     }
@@ -877,13 +1050,14 @@
     if(event.target.matches("[data-pin]"))updatePin();
     if(event.target.matches("[data-sentence]"))sentence=event.target.value;
     if(event.target.matches("[data-profile-name]")){const profile=activeProfile();profile.name=event.target.value;BB.store.save();}
+    if(event.target.matches("[data-profile-detail]")){const profile=activeProfile();profile[event.target.dataset.profileDetail]=event.target.value;BB.store.save();}
     if(event.target.matches("[data-range]")){BB.store.data.settings[event.target.dataset.range]=Number(event.target.value);BB.store.save();}
   }
 
   function handleChange(event){
     if(event.target.matches("[data-upload-card]"))uploadVoice(event.target);
     if(event.target.matches("[data-profile-birthday]")){activeProfile().birthDate=event.target.value;BB.store.save();}
-    if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;BB.store.save();go("parent",{replace:true});}
+    if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;customLoadedProfile="";BB.store.save();go("parent",{replace:true});}
     if(event.target.matches("[data-setting-select]")){BB.store.data.settings[event.target.dataset.settingSelect]=event.target.value;BB.store.save();}
   }
 
