@@ -147,6 +147,7 @@
     }catch{content=safeScreen("Private storage did not open this time. Please try again.");}
     if(token!==epoch||!active||BB.navigation.current!=="memory")return;
     const view=document.querySelector("#view");view.innerHTML=content;view.focus({preventScroll:true});
+    document.documentElement.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0);
   }
   function cancelView(){active=false;epoch++;revokeUrls();}
   function revokeUrls(){urls.forEach(url=>URL.revokeObjectURL(url));urls=[];}
@@ -309,7 +310,17 @@
     BB.speech.stop();
   }
 
+  function resetPageScroll(){
+    document.documentElement.scrollTop=0;
+    document.body.scrollTop=0;
+    window.scrollTo(0,0);
+    const repeat=()=>{document.documentElement.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0);};
+    if(window.requestAnimationFrame)window.requestAnimationFrame(repeat);
+    else setTimeout(repeat,0);
+  }
+
   function go(next,options={}){
+    resetPageScroll();
     if(!options.replace&&route!==next)history.push(route);
     if(next!=="communication"&&recorder?.state==="recording")stopRecording();
     BB.memoryJourney?.cancelView?.();
@@ -322,7 +333,7 @@
       button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","parent","settings"].includes(route)));
     });
     view.focus({preventScroll:true});
-    window.scrollTo({top:0,behavior:BB.store.data.settings.reducedMotion?"auto":"smooth"});
+    resetPageScroll();
   }
 
   function render(options={}){
@@ -504,8 +515,8 @@
     const settings=BB.store.data.settings;
     return `<section>${pageHead("Comfort Settings","Make the mobile experience feel right.","more")}
       <div class="mobile-setting-group"><h3>Sound & appearance</h3>${Object.entries(settingsRows).map(([key,[title,detail]])=>`<div class="mobile-setting-row"><span><strong>${title}</strong><small>${detail}</small></span><button class="mobile-switch ${settings[key]?"on":""}" type="button" role="switch" aria-checked="${settings[key]}" data-setting="${key}"><i></i></button></div>`).join("")}
-        <label class="mobile-setting-row"><span><strong>Family voice volume</strong></span><input type="range" min="0" max="1" step=".05" value="${settings.speechVolume}" data-range="speechVolume"></label>
-        <label class="mobile-setting-row"><span><strong>Effects volume</strong></span><input type="range" min="0" max="1" step=".05" value="${settings.effectsVolume}" data-range="effectsVolume"></label>
+        <label class="mobile-setting-row mobile-range-row"><span><strong>Family voice volume</strong><small>Caregiver recordings and communication cards</small></span><input type="range" min="0" max="1" step=".05" value="${settings.speechVolume}" data-range="speechVolume"></label>
+        <label class="mobile-setting-row mobile-range-row"><span><strong>Effects volume</strong><small>Success and try-again sounds</small></span><input type="range" min="0" max="1" step=".05" value="${settings.effectsVolume}" data-range="effectsVolume"></label>
       </div><p class="muted">🔒 Activity stays on this device. No ads and no tracking.</p>
     </section>`;
   }
