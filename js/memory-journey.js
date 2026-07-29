@@ -50,15 +50,40 @@
   function database() {
     dbPromise ||= new Promise((resolve,reject) => {
       const request = indexedDB.open("brightbridge-private-journey",1);
+      let settled=false;
+      const timer=setTimeout(()=>{
+        if(settled)return;
+        settled=true;
+        reject(new Error("Private memory storage timed out"));
+      },3000);
+      const finish=(callback,value)=>{
+        if(settled)return;
+        settled=true;
+        clearTimeout(timer);
+        callback(value);
+      };
       request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains("voices")) db.createObjectStore("voices",{keyPath:"id"});
         if (!db.objectStoreNames.contains("letters")) db.createObjectStore("letters",{keyPath:"id"});
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+      request.onsuccess = () => finish(resolve,request.result);
+      request.onerror = () => finish(reject,request.error);
+      request.onblocked = () => finish(reject,new Error("Private memory storage is blocked"));
+    }).catch(error=>{dbPromise=null;throw error;});
     return dbPromise;
+  }
+
+  async function waitForRender(promise, milliseconds = 5000) {
+    let timer;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Memory view timed out")),milliseconds);})
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async function store(name, mode, operation) {
@@ -161,12 +186,16 @@
     section = next;
     revokeUrls();
     const view = document.querySelector("#view");
-    view.innerHTML = shell("Private Memory Studio","Loading this child’s private journey…",`<div class="panel memory-loading">💜 Gathering memories kept on this device…</div>`,next);
     const renderers = {
       hub:renderHub, voice:renderVoiceJourney, timeline:renderTimeline,
       letters:renderLetters, celebrate:renderCelebrations, growth:renderGrowthPaths
     };
-    const content=await renderers[next]();
+    let content;
+    try {
+      content=await waitForRender((renderers[next]||renderHub)());
+    } catch {
+      content=shell("Private Memory Studio","The private journal did not finish opening.",`<div class="panel empty-memory"><span>💜</span><h2>Your memories are still safe</h2><p>BrightBridge could not open private storage this time. Nothing was deleted.</p><div class="flash-actions"><button class="primary-button" type="button" data-memory-open="${next}">Try again</button><button class="secondary-button" type="button" data-route="parent">Back to Parent Dashboard</button></div></div>`,next);
+    }
     if(token!==renderToken||!memoryViewActive||BB.navigation.current!=="memory"||!BB.app?.isParentUnlocked?.())return;
     view.innerHTML = content;
     view.focus({preventScroll:true});
