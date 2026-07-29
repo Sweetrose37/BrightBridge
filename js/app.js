@@ -100,6 +100,7 @@
       rewards: renderRewards,
       progress: renderProgress,
       parent: renderParent,
+      memory: () => `<section>${BB.navigation.pageHead("Private Memory Studio","Opening the selected caregiver feature…","parent")}<div class="panel memory-loading">💜 Gathering memories kept on this device…</div></section>`,
       "mobile-tools": () => BB.mobileTools.render(),
       settings: () => BB.settings.render()
     };
@@ -109,6 +110,7 @@
     if (route === "sensory") setupSensory();
     if (route === "nature") setupNature();
     if (route === "parent" && parentUnlocked) refreshVoiceLibrary();
+    if (route === "memory") setTimeout(() => BB.memoryJourney.open(options.section || "hub",{withinRoute:true}),0);
     if (route === "mobile-tools") BB.mobileTools.afterRender();
     if (route === "home") pip("Hi, friend! What should we explore?", "😊", false);
   }

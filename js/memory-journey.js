@@ -146,9 +146,13 @@
     </section>`;
   }
 
-  async function open(next = "hub") {
+  async function open(next = "hub", options = {}) {
     if (!BB.app?.isParentUnlocked?.()) {
       BB.navigation.go("parent");
+      return;
+    }
+    if (BB.navigation.current !== "memory" && !options.withinRoute) {
+      BB.navigation.go("memory",{section:next});
       return;
     }
     const token=++renderToken;
@@ -162,7 +166,7 @@
       letters:renderLetters, celebrate:renderCelebrations, growth:renderGrowthPaths
     };
     const content=await renderers[next]();
-    if(token!==renderToken||!memoryViewActive||BB.navigation.current!=="parent"||!BB.app?.isParentUnlocked?.())return;
+    if(token!==renderToken||!memoryViewActive||BB.navigation.current!=="memory"||!BB.app?.isParentUnlocked?.())return;
     view.innerHTML = content;
     view.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:BB.store.data.settings.reducedMotion?"auto":"smooth"});
