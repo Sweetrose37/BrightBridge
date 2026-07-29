@@ -1,4 +1,4 @@
-const CACHE = "brightbridge-v23";
+const CACHE = "brightbridge-v24";
 const CORE = [
   "./",
   "./index.html",
