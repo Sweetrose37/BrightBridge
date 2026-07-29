@@ -5,13 +5,18 @@
   let databasePromise;
   let activeAudio;
   let activeUrl;
+  let activeFinish;
+  let playbackGeneration = 0;
 
   function normalize(text) {
     return String(text)
       .trim()
+      .normalize("NFKC")
       .toLocaleLowerCase()
-      .replace(/[.!?]+$/g, "")
-      .replace(/\s+/g, " ");
+      .replace(/[’‘`']/g, "")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   function database() {
@@ -45,8 +50,11 @@
     if (!cleanLabel || !(blob instanceof Blob) || blob.size === 0) {
       throw new Error("A phrase and audio clip are required.");
     }
+    const key = normalize(cleanLabel);
+    const existing = (await list()).find(item => normalize(item.label) === key);
+    if (existing && existing.key !== key) await remove(existing.key);
     const record = {
-      key: normalize(cleanLabel),
+      key,
       label: cleanLabel,
       blob,
       type: blob.type || "audio/webm",
@@ -61,7 +69,11 @@
   async function get(text) {
     if (!text) return null;
     try {
-      return await withStore("readonly", store => store.get(normalize(text)));
+      const key = normalize(text);
+      const exact = await withStore("readonly", store => store.get(key));
+      if (exact) return exact;
+      const records = await withStore("readonly", store => store.getAll());
+      return records.find(record => normalize(record.label) === key) || null;
     } catch {
       return null;
     }
@@ -114,7 +126,9 @@
     }
   }
 
-  function stop() {
+  function cleanupActive(notify = true) {
+    const finish = activeFinish;
+    activeFinish = null;
     if (activeAudio) {
       activeAudio.pause();
       activeAudio.currentTime = 0;
@@ -124,25 +138,93 @@
       URL.revokeObjectURL(activeUrl);
       activeUrl = null;
     }
+    if (notify && finish) finish(false);
   }
 
-  async function play(text, volume = 1) {
-    const record = await get(text);
-    if (!record) return false;
-    stop();
+  function stop() {
+    playbackGeneration += 1;
+    cleanupActive();
+  }
+
+  async function startRecord(record, volume = 1) {
+    cleanupActive();
     activeUrl = URL.createObjectURL(record.blob);
     activeAudio = new Audio(activeUrl);
     activeAudio.volume = Math.max(0, Math.min(1, volume));
-    activeAudio.addEventListener("ended", stop, { once: true });
+    activeAudio.addEventListener("ended", cleanupActive, { once: true });
     try {
       await activeAudio.play();
       return true;
     } catch {
-      stop();
+      cleanupActive();
       return false;
     }
   }
 
+  function sequenceFor(text, records) {
+    const words = normalize(text).split(" ").filter(Boolean);
+    const candidates = records.map(record => ({
+      record,
+      words: normalize(record.label).split(" ").filter(Boolean)
+    })).filter(item => item.words.length).sort((a,b) => b.words.length-a.words.length);
+    const result = [];
+    for (let index=0;index<words.length;) {
+      const match = candidates.find(candidate =>
+        candidate.words.every((word,offset) => words[index+offset] === word)
+      );
+      if (!match) return [];
+      result.push(match.record);
+      index += match.words.length;
+    }
+    return result;
+  }
+
+  function playRecordToEnd(record, volume, generation) {
+    return new Promise(resolve => {
+      if (generation !== playbackGeneration) { resolve(false); return; }
+      cleanupActive();
+      activeUrl = URL.createObjectURL(record.blob);
+      activeAudio = new Audio(activeUrl);
+      activeAudio.volume = Math.max(0,Math.min(1,volume));
+      let finished = false;
+      const finish = value => {
+        if (finished) return;
+        finished = true;
+        activeFinish = null;
+        cleanupActive(false);
+        resolve(value);
+      };
+      activeFinish = finish;
+      activeAudio.addEventListener("ended",() => finish(true),{once:true});
+      activeAudio.addEventListener("error",() => finish(false),{once:true});
+      activeAudio.play().catch(() => finish(false));
+    });
+  }
+
+  async function runSequence(records, volume, generation) {
+    for (const record of records) {
+      if (generation !== playbackGeneration) return;
+      const played = await playRecordToEnd(record,volume,generation);
+      if (!played) return;
+    }
+  }
+
+  async function play(text, volume = 1) {
+    const record = await get(text);
+    if (record) {
+      stop();
+      return startRecord(record,volume);
+    }
+    const records = await list();
+    const sequence = sequenceFor(text,records);
+    if (!sequence.length) return false;
+    stop();
+    const generation = playbackGeneration;
+    runSequence(sequence,volume,generation);
+    window.dispatchEvent(new CustomEvent("bb:voice-sequence",{detail:{text,count:sequence.length,labels:sequence.map(item=>item.label)}}));
+    return true;
+  }
+
   window.BB = window.BB || {};
-  BB.voiceLibrary = { normalize, save, get, list, remove, clear, exportAll, importAll, play, stop };
+  BB.voiceLibrary = { normalize, save, get, list, remove, clear, exportAll, importAll, play, stop, sequenceFor };
 })();

@@ -23,6 +23,7 @@
   let objectUrls = [];
   let slideItems = [];
   let slideIndex = 0;
+  let renderToken = 0;
 
   function escapeHtml(value = "") {
     return String(value).replace(/[&<>"']/g, character => ({
@@ -149,6 +150,7 @@
       BB.navigation.go("parent");
       return;
     }
+    const token=++renderToken;
     section = next;
     revokeUrls();
     const view = document.querySelector("#view");
@@ -157,7 +159,9 @@
       hub:renderHub, voice:renderVoiceJourney, timeline:renderTimeline,
       letters:renderLetters, celebrate:renderCelebrations, growth:renderGrowthPaths
     };
-    view.innerHTML = await renderers[next]();
+    const content=await renderers[next]();
+    if(token!==renderToken||BB.navigation.current!=="parent"||!BB.app?.isParentUnlocked?.())return;
+    view.innerHTML = content;
     view.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:BB.store.data.settings.reducedMotion?"auto":"smooth"});
   }
@@ -871,6 +875,7 @@
   }
 
   document.addEventListener("click",async event=>{
+    if(event.target.closest("[data-route]"))renderToken++;
     const openButton=event.target.closest("[data-memory-open]");if(openButton){await open(openButton.dataset.memoryOpen);return;}
     if(event.target.closest("[data-vj-record]")){startRecording();return;}
     if(event.target.closest("[data-vj-stop]")){stopRecording();return;}

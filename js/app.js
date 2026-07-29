@@ -377,13 +377,13 @@
     return `<section>
       ${BB.navigation.pageHead("Parent Dashboard", `Local, private progress for ${escapeHtml(activeProfile.name)}.`)}
       <div class="parent-grid"><div class="stat"><strong>${Math.floor(data.screenSeconds/60)}m</strong><span>Screen time</span></div><div class="stat"><strong>${data.stars}</strong><span>Stars earned</span></div><div class="stat"><strong>${Object.keys(data.activityVisits).length}</strong><span>Areas explored</span></div></div>
-      <div class="setting-group" style="margin-top:18px"><h3>✨ Private Memory & Growth</h3>
+      <div class="setting-group parent-memory-group" style="margin-top:18px"><h3>✨ Private Memory & Growth</h3>
         <div class="voice-studio-intro"><span>🌈</span><div><strong>One continuous story—without duplicate tracking</strong><p>Voice Journey, Future Letters, celebrations, and Growth Paths reuse this profile’s existing communication, learning, Reward Garden, and progress history.</p></div></div>
-        <div class="memory-card-grid" style="padding:16px">
-          <button class="memory-feature-card voice" type="button" data-memory-open="voice"><span>🎤</span><div><h2>Voice Journey™</h2><p>Private recordings, caregiver-defined milestones, comparison, search, and export.</p></div></button>
-          <button class="memory-feature-card timeline" type="button" data-memory-open="timeline"><span>🌈</span><div><h2>Look How Far I’ve Come™</h2><p>A personal growth timeline, birthdays, and anniversary replays.</p></div></button>
-          <button class="memory-feature-card letters" type="button" data-memory-open="letters"><span>💌</span><div><h2>Future Letters™</h2><p>Private letters, attachments, reading choices, and keepsake books.</p></div></button>
-          <button class="memory-feature-card growth" type="button" data-memory-open="growth"><span>🌱</span><div><h2>Growth Paths™</h2><p>Caregiver-controlled stages that always preserve history.</p></div></button>
+        <div class="parent-memory-grid">
+          <button type="button" data-memory-open="voice"><span>🎤</span><strong>Voice Journey™</strong><small>Recordings and milestones</small></button>
+          <button type="button" data-memory-open="timeline"><span>🌈</span><strong>Growth Timeline</strong><small>Personal celebrations</small></button>
+          <button type="button" data-memory-open="letters"><span>💌</span><strong>Future Letters™</strong><small>Letters and keepsakes</small></button>
+          <button type="button" data-memory-open="growth"><span>🌱</span><strong>Growth Paths™</strong><small>Stages and controls</small></button>
         </div>
         <div class="flash-actions"><button class="secondary-button" type="button" data-memory-open="hub">Open Memory Home</button><button class="secondary-button" type="button" data-memory-encrypted-backup>Encrypted memory backup</button><label class="secondary-button">Restore encrypted backup<input class="sr-only" type="file" accept=".bbsecure,application/json" data-memory-encrypted-restore></label></div>
       </div>
@@ -662,6 +662,7 @@
   document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal();});
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;document.querySelector('[data-action="install"]').hidden=false;});
   window.addEventListener("bb:reward",() => updateHeader());
+  window.addEventListener("bb:voice-sequence",event=>toast(`Playing ${event.detail.count} matching family recordings in order.`));
   window.addEventListener("error",event=>{console.error(event.error);toast("Something paused. Please try that touch again.");});
 
   function init() {

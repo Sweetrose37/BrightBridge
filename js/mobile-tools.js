@@ -131,7 +131,7 @@
   }
 
   async function refreshCoverage() {
-    const list=await BB.voiceLibrary.list();const keys=new Set(list.map(item=>item.key));
+    const list=await BB.voiceLibrary.list();const keys=new Set(list.map(item=>BB.voiceLibrary.normalize(item.label)));
     const covered=commonVoicePhrases.filter(phrase=>keys.has(BB.voiceLibrary.normalize(phrase)));
     const meter=document.querySelector("#coverage-value");const label=document.querySelector("#coverage-label");const target=document.querySelector("#coverage-list");
     if(meter)meter.style.width=`${covered.length/commonVoicePhrases.length*100}%`;
