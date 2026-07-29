@@ -151,6 +151,7 @@
     activeUrl = URL.createObjectURL(record.blob);
     activeAudio = new Audio(activeUrl);
     activeAudio.volume = Math.max(0, Math.min(1, volume));
+    if (document.body.classList.contains("mobile-app")) activeAudio.playbackRate = Math.max(0.6,Math.min(1.25,BB.store?.data?.settings?.speechRate || 1));
     activeAudio.addEventListener("ended", cleanupActive, { once: true });
     try {
       await activeAudio.play();
@@ -186,6 +187,7 @@
       activeUrl = URL.createObjectURL(record.blob);
       activeAudio = new Audio(activeUrl);
       activeAudio.volume = Math.max(0,Math.min(1,volume));
+      if (document.body.classList.contains("mobile-app")) activeAudio.playbackRate = Math.max(0.6,Math.min(1.25,BB.store?.data?.settings?.speechRate || 1));
       let finished = false;
       const finish = value => {
         if (finished) return;

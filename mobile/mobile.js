@@ -15,6 +15,10 @@
   let chunks=[];
   let startedAt=0;
   let urls=[];
+  let voiceQuery="";
+  let voiceSort="newest";
+  let slideshowItems=[];
+  let slideshowIndex=0;
 
   function esc(value=""){return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));}
   function profile(){const data=BB.store.data;return data.profiles.find(item=>item.id===data.activeProfile)||data.profiles[0];}
@@ -32,6 +36,21 @@
   }
   function formatDate(value){if(!value)return "Date not added";const date=new Date(value);return Number.isNaN(date.getTime())?value:date.toLocaleString([],{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
   function localDateTime(){const date=new Date(),offset=date.getTimezoneOffset();return new Date(date.getTime()-offset*60000).toISOString().slice(0,16);}
+  function isBirthday(value){if(!value)return false;const date=new Date(`${value}T12:00:00`),today=new Date();return date.getMonth()===today.getMonth()&&date.getDate()===today.getDate();}
+  function sanitizeRichHtml(value=""){
+    const template=document.createElement("template");template.innerHTML=String(value);
+    template.content.querySelectorAll("script,style,iframe,object,embed").forEach(node=>node.remove());
+    const allowed=new Set(["P","BR","STRONG","B","EM","I","UL","OL","LI"]);
+    template.content.querySelectorAll("*").forEach(node=>{[...node.attributes].forEach(attribute=>node.removeAttribute(attribute.name));if(!allowed.has(node.tagName))node.replaceWith(...node.childNodes);});
+    return template.innerHTML;
+  }
+  function downloadBlob(blob,name){const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),500);}
+  function printHtml(title,body){
+    const popup=window.open("","_blank");if(!popup){BB.app.toast("Allow pop-ups to save a PDF.");return;}
+    popup.opener=null;popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:35px auto;color:#24324a;line-height:1.55;padding:20px}h1{color:#7055b8}article{padding:14px 0;border-bottom:1px solid #ddd}.tag{display:inline-block;padding:4px 8px;margin:2px;border-radius:99px;background:#eee8fc}@media print{button{display:none}}</style></head><body>${body}<script>setTimeout(()=>window.print(),300)<\/script></body></html>`);popup.document.close();
+  }
+  function blobToDataUrl(blob){return new Promise((resolve,reject)=>{if(!blob){resolve(null);return;}const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);});}
+  function dataUrlBlob(dataUrl){return fetch(dataUrl).then(response=>response.blob());}
 
   function database(){
     if(dbPromise)return dbPromise;
@@ -62,6 +81,12 @@
   }
   function saveVoice(record){return voiceStore("readwrite",store=>store.put(record));}
   function removeVoice(id){return voiceStore("readwrite",store=>store.delete(id));}
+  async function filteredVoices(){
+    let items=await voices(),query=voiceQuery.trim().toLowerCase();
+    if(query)items=items.filter(item=>[item.title,item.age,item.notes,item.milestoneLabel,(item.tags||[]).join(" "),formatDate(item.dateTime)].join(" ").toLowerCase().includes(query));
+    const sorters={newest:(a,b)=>new Date(b.dateTime)-new Date(a.dateTime),oldest:(a,b)=>new Date(a.dateTime)-new Date(b.dateTime),age:(a,b)=>String(a.age||"").localeCompare(String(b.age||"")),milestones:(a,b)=>Number(b.milestone)-Number(a.milestone),tags:(a,b)=>String(a.tags?.[0]||"").localeCompare(String(b.tags?.[0]||"")),favorites:(a,b)=>Number(b.favorite)-Number(a.favorite)};
+    return items.sort(sorters[voiceSort]||sorters.newest);
+  }
   async function letters(){
     let privateLetters=[];
     try{privateLetters=await privateStore("letters","readonly",store=>store.getAll());}catch{}
@@ -70,7 +95,7 @@
   }
 
   function tabs(){
-    return `<div class="mobile-category-row">${[["hub","✨","Memory Home"],["voice","🎤","Voice Journey"],["timeline","🌈","Timeline"],["letters","💌","Letters"],["growth","🌱","Growth Paths"]].map(([id,icon,label])=>`<button class="mobile-chip ${memorySection===id?"active":""}" type="button" data-mobile-memory-open="${id}">${icon} ${label}</button>`).join("")}</div>`;
+    return `<div class="mobile-category-row">${[["hub","✨","Memory Home"],["voice","🎤","Voice Journey"],["compare","↔️","Compare"],["timeline","🌈","Timeline"],["letters","💌","Letters"],["growth","🌱","Growth Paths"],["celebrate","🎉","Celebrations"]].map(([id,icon,label])=>`<button class="mobile-chip ${memorySection===id?"active":""}" type="button" data-mobile-memory-open="${id}">${icon} ${label}</button>`).join("")}</div>`;
   }
   function shell(title,subtitle,content){
     return `<section>${BB.navigation.pageHead(title,subtitle,"parent")}${tabs()}${content}</section>`;
@@ -83,6 +108,7 @@
     const voiceItems=await voices(),letterItems=await letters(),path=growth();
     const stage=stages.find(item=>item.id===path.stage)||stages[0];
     return shell("Private Memory Home",`A private, caregiver-controlled story for ${profile().name}.`,`
+      ${isBirthday(profile().birthDate)?`<button class="mobile-birthday-banner" type="button" data-mobile-memory-open="celebrate">🎉 Happy Birthday, ${esc(profile().name)}! Your celebration is ready.</button>`:""}
       <div class="mobile-panel"><h3>🔒 Private by default</h3><p>Recordings, letters, and milestones remain on this device. BrightBridge never translates, decodes, diagnoses, or infers meaning from vocalizations.</p></div>
       <div class="mobile-memory-grid">
         <button class="mobile-memory-button" type="button" data-mobile-memory-open="voice"><span>🎤</span>Voice Journey<small>${voiceItems.length} recordings</small></button>
@@ -92,7 +118,7 @@
       </div>`);
   }
   async function renderVoice(){
-    const items=await voices();
+    const items=await filteredVoices();
     revokeUrls();
     return shell("Voice Journey™","Caregiver-authored memories of meaningful vocal moments.",`
       <div class="mobile-panel"><h3>Add a private recording</h3>
@@ -100,15 +126,30 @@
         <label class="mobile-setting-row"><span><strong>Date and time</strong></span><input type="datetime-local" data-mv-date value="${localDateTime()}"></label>
         <label class="mobile-setting-row"><span><strong>Child age</strong></span><input data-mv-age maxlength="30" placeholder="3 years, 2 months"></label>
         <label class="mobile-setting-row"><span><strong>Notes</strong></span><textarea data-mv-notes rows="3" maxlength="800"></textarea></label>
+        <label class="mobile-setting-row"><span><strong>Tags</strong><small>Happy, practicing, family, school…</small></span><input data-mv-tags maxlength="160" placeholder="Happy, New Sound"></label>
         <label class="mobile-setting-row"><span><strong>Milestone</strong><small>Caregiver-defined</small></span><input type="checkbox" data-mv-milestone></label>
+        <label class="mobile-setting-row"><span><strong>Milestone name</strong></span><input data-mv-milestone-label maxlength="80" placeholder="First recognizable word"></label>
+        <label class="mobile-setting-row"><span><strong>Favorite recording</strong></span><input type="checkbox" data-mv-favorite></label>
+        <label class="mobile-setting-row"><span><strong>Include in anniversary replay</strong></span><input type="checkbox" data-mv-replay></label>
         <div class="mobile-button-row"><button class="mobile-button" type="button" data-mv-record>🎙️ Record</button><label class="mobile-button secondary">⬆ Upload<input class="sr-only" type="file" accept="audio/*" data-mv-upload></label><button class="mobile-button danger" type="button" data-mv-stop hidden>■ Stop</button></div>
         <p class="muted" data-mv-status>Audio stays on this device.</p>
       </div>
+      <div class="mobile-panel"><div class="mobile-tool-form"><input data-mv-search value="${esc(voiceQuery)}" placeholder="Search title, age, tags, milestones, or notes"><select data-mv-sort aria-label="Sort recordings">${[["newest","Newest"],["oldest","Oldest"],["age","Age"],["milestones","Milestones"],["tags","Tags"],["favorites","Favorites"]].map(([id,label])=>`<option value="${id}" ${voiceSort===id?"selected":""}>${label}</option>`).join("")}</select></div><div class="mobile-button-row" style="margin-top:10px"><button class="mobile-button secondary" type="button" data-memory-print="voice">Timeline PDF</button><button class="mobile-button secondary" type="button" data-mobile-memory-open="compare">Compare two</button><button class="mobile-button secondary" type="button" data-mv-export-selected>Selected ZIP</button><button class="mobile-button secondary" type="button" data-mv-export-all>All audio ZIP</button></div></div>
       <div class="mobile-list">${items.length?items.map(item=>voiceCard(item)).join(""):`<div class="mobile-panel"><h3>Your first recording starts the timeline</h3><p>Try a title such as Morning Babble, Story Time, or First Word.</p></div>`}</div>`);
   }
   function voiceCard(item){
     const url=URL.createObjectURL(item.blob);urls.push(url);
-    return `<article class="mobile-panel"><h3>${item.milestone?"⭐ ":""}${esc(item.title)}</h3><p class="muted">${formatDate(item.dateTime)} · Age ${esc(item.age||"not added")}</p><audio controls preload="metadata" src="${url}" style="width:100%"></audio>${item.notes?`<p>${esc(item.notes)}</p>`:""}<button class="mobile-button danger" type="button" data-mv-delete="${item.id}">Delete</button></article>`;
+    return `<article class="mobile-panel"><label class="mobile-select-memory"><input type="checkbox" data-mv-select="${item.id}"> Select for export</label><h3>${item.milestone?"⭐ ":""}${item.favorite?"💜 ":""}${esc(item.title)}</h3><p class="muted">${formatDate(item.dateTime)} · Age ${esc(item.age||"not added")} · ${Math.round(item.duration||0)} sec</p>${item.milestone?`<p><strong>🏆 ${esc(item.milestoneLabel||"Personal Achievement")}</strong></p>`:""}<audio controls preload="metadata" src="${url}" style="width:100%"></audio>${item.notes?`<p>${esc(item.notes)}</p>`:""}<div class="mobile-tag-row">${(item.tags||[]).map(tag=>`<span>${esc(tag)}</span>`).join("")}${item.replay?"<span>🎞️ Replay</span>":""}</div><div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-mv-favorite="${item.id}">${item.favorite?"Unfavorite":"Favorite"}</button><button class="mobile-button secondary" type="button" data-mv-download="${item.id}">Audio</button><button class="mobile-button secondary" type="button" data-memory-print-record="${item.id}">PDF</button><button class="mobile-button danger" type="button" data-mv-delete="${item.id}">Delete</button></div></article>`;
+  }
+  async function renderCompare(){
+    const items=await voices();revokeUrls();
+    if(items.length<2)return shell("Compare Voice Memories","Compare only this child's own recordings.",`<div class="mobile-panel"><h2>Two recordings are needed</h2><p>Create another Voice Journey recording to use comparison mode.</p><button class="mobile-button" type="button" data-mobile-memory-open="voice">Open Voice Journey</button></div>`);
+    const options=items.map(item=>`<option value="${item.id}">${esc(item.title)} · ${formatDate(item.dateTime)}</option>`).join("");
+    return shell("Compare Voice Memories","Caregiver-controlled side-by-side listening.",`<div class="mobile-panel"><label class="mobile-tool-label">Earlier recording<select data-mv-compare-left>${options}</select></label><label class="mobile-tool-label">Later recording<select data-mv-compare-right>${items.slice().reverse().map(item=>`<option value="${item.id}">${esc(item.title)} · ${formatDate(item.dateTime)}</option>`).join("")}</select></label><button class="mobile-button" type="button" data-mv-compare>Compare</button></div><div id="mobile-comparison" class="mobile-comparison-grid">${comparisonCard(items[0],"Recording one")}${comparisonCard(items[items.length-1],"Recording two")}</div>`);
+  }
+  function comparisonCard(item,label){
+    const url=URL.createObjectURL(item.blob);urls.push(url);
+    return `<article class="mobile-panel"><small class="muted">${label}</small><h2>${esc(item.title)}</h2><audio controls src="${url}" style="width:100%"></audio><p><strong>Date:</strong> ${formatDate(item.dateTime)}</p><p><strong>Age:</strong> ${esc(item.age||"Not added")}</p><p><strong>Milestone:</strong> ${esc(item.milestoneLabel||"Not marked")}</p><p><strong>Tags:</strong> ${esc((item.tags||[]).join(", ")||"None")}</p><p><strong>Notes:</strong> ${esc(item.notes||"None")}</p></article>`;
   }
   function computedTimeline(){
     const data=BB.store.data,items=state().events.filter(item=>!item.profileId||item.profileId===data.activeProfile);
@@ -117,23 +158,34 @@
     return items.sort((a,b)=>new Date(b.date)-new Date(a.date));
   }
   async function renderTimeline(){
-    const items=computedTimeline(),voiceItems=await voices(),letterItems=await letters();
+    const items=computedTimeline(),voiceItems=await voices(),letterItems=await letters();items.push(...voiceItems.map(item=>({icon:item.milestone?"🏆":"🎤",title:item.title,detail:item.milestoneLabel||item.notes||"Voice Journey memory",date:item.dateTime})),...letterItems.map(item=>({icon:"💌",title:item.title,detail:`A letter from ${item.author||"Caregiver"}`,date:item.date})));items.sort((a,b)=>new Date(b.date)-new Date(a.date));
     return shell("Look How Far I’ve Come™","Celebrate only this child's own progress.",`
       <div class="mobile-stats"><div class="mobile-stat"><strong>⭐ ${BB.store.data.stars}</strong><span>Stars</span></div><div class="mobile-stat"><strong>🌻 ${BB.store.data.flowers}</strong><span>Flowers</span></div><div class="mobile-stat"><strong>🎤 ${voiceItems.length}</strong><span>Voice memories</span></div><div class="mobile-stat"><strong>💌 ${letterItems.length}</strong><span>Letters</span></div></div>
-      <div class="mobile-list" style="margin-top:13px">${items.length?items.map(item=>`<article class="mobile-list-card"><span>${item.icon||"✨"}</span><div><strong>${esc(item.title)}</strong><small>${formatDate(item.date)} · ${esc(item.detail||"Meaningful progress")}</small></div></article>`).join(""):`<div class="mobile-panel"><h3>This journey is ready to grow</h3><p>Personal milestones will appear as BrightBridge is used.</p></div>`}</div>`);
+      <div class="mobile-button-row" style="margin:13px 0"><button class="mobile-button secondary" type="button" data-memory-print="timeline">Save timeline PDF</button><button class="mobile-button" type="button" data-memory-slideshow>Journey Through Time</button></div>
+      <div class="mobile-list">${items.length?items.map(item=>`<article class="mobile-list-card"><span>${item.icon||"✨"}</span><div><strong>${esc(item.title)}</strong><small>${formatDate(item.date)} · ${esc(item.detail||"Meaningful progress")}</small></div></article>`).join(""):`<div class="mobile-panel"><h3>This journey is ready to grow</h3><p>Personal milestones will appear as BrightBridge is used.</p></div>`}</div>`);
   }
   async function renderLetters(){
-    const letterItems=await letters();
+    const letterItems=await letters(),voiceItems=await voices();
     return shell("Letters to My Future Self™","Private messages of love, encouragement, and memories.",`
-      <div class="mobile-panel"><h3>Write a letter</h3><label class="mobile-setting-row"><span><strong>Title</strong></span><input data-ml-title maxlength="100" placeholder="A memory for your future"></label><label class="mobile-setting-row"><span><strong>Author</strong></span><input data-ml-author maxlength="60" placeholder="Mom, Dad, Grandma…"></label><label class="mobile-setting-row"><span><strong>Letter</strong></span><textarea data-ml-body rows="7" maxlength="5000" placeholder="Today you surprised me by…"></textarea></label><button class="mobile-button" type="button" data-ml-save>Save private letter</button></div>
-      <div class="mobile-list">${letterItems.length?letterItems.map(letter=>`<article class="mobile-panel"><h3>💌 ${esc(letter.title)}</h3><p class="muted">${formatDate(letter.date||letter.createdAt)} · From ${esc(letter.author||"Caregiver")}</p><p>${esc(letter.body||letter.content||"")}</p><button class="mobile-button danger" type="button" data-ml-delete="${letter.id}">Delete</button></article>`).join(""):`<div class="mobile-panel"><p>No letters yet. A future keepsake can begin today.</p></div>`}</div>`);
+      <div class="mobile-panel"><h3>Write a letter</h3><p class="muted">Try: Today you smiled when… · I am proud of you because… · A memory I never want to forget…</p><label class="mobile-setting-row"><span><strong>Title</strong></span><input data-ml-title maxlength="100" placeholder="A memory for your future"></label><label class="mobile-setting-row"><span><strong>Date</strong></span><input type="date" data-ml-date value="${new Date().toISOString().slice(0,10)}"></label><label class="mobile-setting-row"><span><strong>Child age</strong></span><input data-ml-age maxlength="30" placeholder="5 years"></label><label class="mobile-setting-row"><span><strong>Author</strong></span><input data-ml-author maxlength="60" placeholder="Mom, Dad, Grandma…"></label><label class="mobile-setting-row"><span><strong>Future reading</strong></span><select data-ml-unlock>${["Read Anytime","Read Next Birthday","Read at Age 10","Read at Age 13","Read at Age 18","Never Auto-Open"].map(item=>`<option>${item}</option>`).join("")}</select></label><label class="mobile-setting-row"><span><strong>Optional photo</strong></span><input type="file" accept="image/*" data-ml-photo></label><label class="mobile-setting-row"><span><strong>Voice Journey attachment</strong></span><select data-ml-voice><option value="">None</option>${voiceItems.map(item=>`<option value="${item.id}">${esc(item.title)}</option>`).join("")}</select></label><label class="mobile-setting-row"><span><strong>Memory attachments</strong><small>Achievements, favorite AAC phrases, songs, drawings…</small></span><input data-ml-memories maxlength="400"></label><label class="mobile-setting-row"><span><strong>My Day Replay summary</strong></span><textarea data-ml-day rows="3" maxlength="600"></textarea></label><label class="mobile-setting-row"><span><strong>Attach Reward Garden snapshot</strong></span><input type="checkbox" data-ml-garden></label><div class="mobile-rich-toolbar"><button type="button" data-ml-format="bold"><strong>B</strong></button><button type="button" data-ml-format="italic"><em>I</em></button><button type="button" data-ml-format="insertUnorderedList">• List</button></div><div class="mobile-rich-editor" contenteditable="true" data-ml-body role="textbox" aria-multiline="true" data-placeholder="Today you surprised me by…"></div><button class="mobile-button mobile-wide-button" type="button" data-ml-save>Save private letter</button></div>
+      <div class="mobile-button-row" style="margin-bottom:13px"><button class="mobile-button secondary" type="button" data-keepsake-book>Keepsake Book PDF</button><button class="mobile-button secondary" type="button" data-memory-slideshow>Letters slideshow</button></div>
+      <div class="mobile-list">${letterItems.length?letterItems.map(letter=>letterCard(letter)).join(""):`<div class="mobile-panel"><p>No letters yet. A future keepsake can begin today.</p></div>`}</div>`);
+  }
+  function letterCard(letter){
+    let image="";if(letter.photo){const url=URL.createObjectURL(letter.photo);urls.push(url);image=`<img class="mobile-letter-photo" src="${url}" alt="">`;}
+    return `<article class="mobile-panel">${image}<p class="muted">${esc(letter.unlockRule||"Read Anytime")}</p><h3>💌 ${esc(letter.title)}</h3><p class="muted">${formatDate(letter.date||letter.createdAt)} · Age ${esc(letter.age||"not added")} · From ${esc(letter.author||"Caregiver")}</p><div class="mobile-letter-body">${sanitizeRichHtml(letter.body||esc(letter.content||""))}</div>${letter.voiceTitle?`<p>🎤 <strong>Voice memory:</strong> ${esc(letter.voiceTitle)}</p>`:""}${letter.dayReplay?`<p>☀️ <strong>My Day Replay:</strong> ${esc(letter.dayReplay)}</p>`:""}${letter.gardenSnapshot?`<p>🌻 <strong>Reward Garden:</strong> ${letter.gardenSnapshot.flowers} flowers · ${letter.gardenSnapshot.butterflies} butterflies</p>`:""}${letter.memories?.length?`<p><strong>Attached memories:</strong> ${esc(letter.memories.join(", "))}</p>`:""}<div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-ml-print="${letter.id}">PDF</button><button class="mobile-button danger" type="button" data-ml-delete="${letter.id}">Delete</button></div></article>`;
   }
   function renderGrowth(){
     const path=growth();
     return shell("BrightBridge Growth Paths™","Caregiver-controlled stages that never erase history.",`
       <div class="mobile-panel"><h3>Caregiver promise</h3><p>Changing a stage updates age-appropriate presentation and vocabulary. Voice memories, letters, rewards, achievements, and communication history remain preserved.</p></div>
-      <div class="mobile-list">${stages.map((stage,index)=>`<article class="mobile-panel" style="${path.stage===stage.id?"border:3px solid var(--purple)":""}"><div style="font-size:44px">${stage.icon}</div><p class="muted">Stage ${index+1} · ${stage.ages}</p><h2>${stage.name}</h2><p>${stage.focus}</p><button class="mobile-button ${path.stage===stage.id?"secondary":""}" type="button" data-mg-stage="${stage.id}">${path.stage===stage.id?"Current stage":"Choose stage"}</button></article>`).join("")}</div>
+      <div class="mobile-setting-group"><h3>Progression controls</h3><label class="mobile-setting-row"><span><strong>Child birthday</strong><small>Private and caregiver-controlled</small></span><input type="date" data-mg-birthday value="${esc(profile().birthDate||"")}"></label>${[["automatic","Automatic age suggestion"],["locked","Lock current stage"],["matureContent","Caregiver-approved mature content"]].map(([key,label])=>`<div class="mobile-setting-row"><span><strong>${label}</strong></span><button class="mobile-switch ${path[key]?"on":""}" type="button" data-mg-toggle="${key}"><i></i></button></div>`).join("")}</div>
+      <div class="mobile-list">${stages.map((stage,index)=>`<article class="mobile-panel" style="${path.stage===stage.id?"border:3px solid var(--purple)":""}"><div style="font-size:44px">${stage.icon}</div><p class="muted">Stage ${index+1} · ${stage.ages}</p><h2>${stage.name}</h2><p>${stage.focus}</p><div class="mobile-button-row"><button class="mobile-button ${path.stage===stage.id?"secondary":""}" type="button" data-mg-stage="${stage.id}">${path.stage===stage.id?"Current stage":"Choose stage"}</button><button class="mobile-button secondary" type="button" data-mg-preview="${stage.id}">Preview</button></div></article>`).join("")}</div>
       <div class="mobile-setting-group"><h3>Available child features</h3>${Object.entries(path.enabledFeatures).map(([key,on])=>`<div class="mobile-setting-row"><span><strong>${key[0].toUpperCase()+key.slice(1)}</strong></span><button class="mobile-switch ${on?"on":""}" type="button" data-mg-feature="${key}"><i></i></button></div>`).join("")}</div>`);
+  }
+  async function renderCelebrate(){
+    const data=BB.store.data,voiceItems=await voices(),letterItems=await letters(),completed=Object.values(data.progress||{}).reduce((sum,value)=>sum+value,0),name=profile().name;
+    return shell("Celebrations & Replays","Private keepsakes celebrating only this child's own journey.",`<div class="mobile-celebration"><div>🎉 ⭐ 🌸 🦋</div><h1>Happy Birthday, ${esc(name)}!</h1><p>This year you grew ${data.flowers} flowers, earned ${data.butterflies} butterflies, completed ${completed} learning activities, explored ${Object.keys(data.wordUse||{}).length} communication words, saved ${voiceItems.length} voice memories, and received ${letterItems.length} future letters.</p><h2>Look how much you’ve grown!</h2></div><div class="mobile-button-row"><button class="mobile-button" type="button" data-birthday-export="pdf">Birthday PDF</button><button class="mobile-button secondary" type="button" data-birthday-export="image">Birthday image</button><button class="mobile-button secondary" type="button" data-memory-slideshow>Play keepsake slideshow</button></div><div class="mobile-panel" style="margin-top:13px"><h2>Journey Through Time</h2><p>An anniversary replay of caregiver-selected Voice Journey recordings, learning milestones, Reward Garden growth, communication moments, letters, and achievements.</p><button class="mobile-button" type="button" data-memory-slideshow>Start anniversary replay</button></div>`);
   }
 
   async function open(next="hub",options={}){
@@ -142,7 +194,7 @@
     const token=++epoch;active=true;memorySection=next;
     let content;
     try{
-      const renderer={hub:renderHub,voice:renderVoice,timeline:renderTimeline,letters:renderLetters,growth:renderGrowth}[next]||renderHub;
+      const renderer={hub:renderHub,voice:renderVoice,compare:renderCompare,timeline:renderTimeline,letters:renderLetters,growth:renderGrowth,celebrate:renderCelebrate}[next]||renderHub;
       content=await Promise.race([renderer(),new Promise((_,reject)=>setTimeout(()=>reject(new Error("Memory screen timed out")),4500))]);
     }catch{content=safeScreen("Private storage did not open this time. Please try again.");}
     if(token!==epoch||!active||BB.navigation.current!=="memory")return;
@@ -158,7 +210,8 @@
     BB.store.save();
   }
   function applyGrowthPath(){
-    const path=growth();document.body.dataset.growthStage=path.stage;
+    const path=growth(),birthday=profile().birthDate;if(path.automatic&&!path.locked&&birthday){const born=new Date(`${birthday}T12:00:00`),age=Math.floor((Date.now()-born.getTime())/31557600000);path.stage=age>=13?"teen-young-adult":age>=9?"independent-communicator":age>=5?"growing-learner":"early-explorer";}
+    document.body.dataset.growthStage=path.stage;document.body.classList.toggle("mature-content",!!path.matureContent);
     Object.entries(path.enabledFeatures).forEach(([key,on])=>document.body.classList.toggle(`feature-disabled-${key}`,!on));
   }
   function stageVocabulary(){
@@ -178,14 +231,69 @@
     state().events=[];state().mobileLetters=[];BB.store.save();
     try{await Promise.all([voiceStore("readwrite",store=>store.clear()),privateStore("letters","readwrite",store=>store.clear())]);}catch{}
   }
+  async function exportAll(){
+    let voiceItems=[],letterItems=[];try{voiceItems=await voiceStore("readonly",store=>store.getAll());letterItems=await privateStore("letters","readonly",store=>store.getAll());}catch{}
+    return {voices:await Promise.all(voiceItems.map(async({blob,...item})=>({...item,audioDataUrl:await blobToDataUrl(blob)}))),letters:await Promise.all(letterItems.map(async({photo,...item})=>({...item,photoDataUrl:await blobToDataUrl(photo)})))};
+  }
+  async function importAll(payload={}){
+    for(const item of payload.voices||[]){if(!item.audioDataUrl)continue;const {audioDataUrl,...meta}=item;await saveVoice({...meta,id:meta.id||`voice-${Date.now()}`,profileId:meta.profileId||BB.store.data.activeProfile,blob:await dataUrlBlob(audioDataUrl)});}
+    for(const item of payload.letters||[]){const {photoDataUrl,...meta}=item,photo=photoDataUrl?await dataUrlBlob(photoDataUrl):null;await privateStore("letters","readwrite",store=>store.put({...meta,id:meta.id||`letter-${Date.now()}`,profileId:meta.profileId||BB.store.data.activeProfile,photo}));}
+  }
+  async function printSummary(kind,id=null){
+    if(id){
+      const item=await voiceStore("readonly",store=>store.get(id));if(!item)return;
+      printHtml(item.title,`<h1>🎤 ${esc(item.title)}</h1><p>${formatDate(item.dateTime)} · Age ${esc(item.age||"not added")} · ${Math.round(item.duration||0)} seconds</p><p>${esc(item.notes||"")}</p><p>${(item.tags||[]).map(tag=>`<span class="tag">${esc(tag)}</span>`).join("")}</p>${item.milestone?`<p><strong>Caregiver-defined milestone:</strong> ${esc(item.milestoneLabel||"Personal Achievement")}</p>`:""}<p><em>This is a caregiver-authored memory. BrightBridge does not interpret vocalizations.</em></p>`);return;
+    }
+    if(kind==="voice"){const items=await filteredVoices();printHtml("Voice Journey Timeline",`<h1>${esc(profile().name)} — Voice Journey™</h1><p>Caregiver-authored memories. No vocalizations were translated, interpreted, or diagnosed.</p>${items.map(item=>`<article><h2>${item.milestone?"⭐ ":""}${esc(item.title)}</h2><p>${formatDate(item.dateTime)} · Age ${esc(item.age||"not added")}</p><p>${esc(item.notes||"")}</p></article>`).join("")||"<p>No recordings yet.</p>"}`);return;}
+    const items=computedTimeline();printHtml("Look How Far I’ve Come",`<h1>${esc(profile().name)} — Look How Far I’ve Come™</h1><p>This timeline celebrates only this child’s own journey.</p>${items.slice().reverse().map(item=>`<article><h2>${item.icon||"✨"} ${esc(item.title)}</h2><p>${formatDate(item.date)} · ${esc(item.detail||"")}</p></article>`).join("")}`);
+  }
+  function crc32(bytes){let crc=-1;for(const byte of bytes){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}return (crc^-1)>>>0;}
+  function le16(value){return new Uint8Array([value&255,(value>>>8)&255]);}
+  function le32(value){return new Uint8Array([value&255,(value>>>8)&255,(value>>>16)&255,(value>>>24)&255]);}
+  async function exportAudioZip(selectedOnly=false){
+    let items=await voices();if(selectedOnly){const ids=new Set([...document.querySelectorAll("[data-mv-select]:checked")].map(input=>input.dataset.mvSelect));items=items.filter(item=>ids.has(item.id));}if(!items.length){BB.app.toast(selectedOnly?"Select at least one recording first.":"No Voice Journey recordings to export.");return;}
+    const encoder=new TextEncoder(),local=[],central=[];let offset=0;
+    const now=new Date(),dosTime=(now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1),dosDate=((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate();
+    for(let index=0;index<items.length;index++){
+      const item=items[index],bytes=new Uint8Array(await item.blob.arrayBuffer()),extension=item.blob.type.includes("mp4")?"m4a":item.blob.type.includes("mpeg")?"mp3":"webm",name=encoder.encode(`${String(index+1).padStart(2,"0")}-${item.title.replace(/[^a-z0-9]+/gi,"-").replace(/^-|-$/g,"")||"recording"}.${extension}`),crc=crc32(bytes);
+      const header=[le32(0x04034b50),le16(20),le16(0),le16(0),le16(dosTime),le16(dosDate),le32(crc),le32(bytes.length),le32(bytes.length),le16(name.length),le16(0),name];
+      local.push(...header,bytes);
+      central.push(le32(0x02014b50),le16(20),le16(20),le16(0),le16(0),le16(dosTime),le16(dosDate),le32(crc),le32(bytes.length),le32(bytes.length),le16(name.length),le16(0),le16(0),le16(0),le16(0),le32(0),le32(offset),name);
+      offset+=header.reduce((sum,part)=>sum+part.length,0)+bytes.length;
+    }
+    const centralSize=central.reduce((sum,part)=>sum+part.length,0),end=[le32(0x06054b50),le16(0),le16(0),le16(items.length),le16(items.length),le32(centralSize),le32(offset),le16(0)];
+    downloadBlob(new Blob([...local,...central,...end],{type:"application/zip"}),`voice-journey-${new Date().toISOString().slice(0,10)}.zip`);
+  }
+  async function showSlideshow(){
+    const voiceItems=(await voices()).filter(item=>item.replay),letterItems=await letters();
+    slideshowItems=[...computedTimeline().map(item=>({...item,type:"event"})),...voiceItems.map(item=>({type:"voice",icon:"🎤",title:item.title,detail:item.milestoneLabel||item.notes||"Voice Journey memory",date:item.dateTime,blob:item.blob})),...letterItems.map(item=>({type:"letter",icon:"💌",title:item.title,detail:`A letter from ${item.author||"Caregiver"}`,date:item.date,photo:item.photo}))].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    if(!slideshowItems.length){BB.app.toast("Add a memory before starting the slideshow.");return;}slideshowIndex=0;
+    BB.app.modal(`<div class="mobile-modal-head"><h2>Journey Through Time</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><div id="mobile-slide"></div><div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-slide-prev>← Previous</button><button class="mobile-button" type="button" data-slide-next>Next →</button></div>`,"Journey Through Time");renderSlide();
+  }
+  function renderSlide(){
+    const target=document.querySelector("#mobile-slide"),item=slideshowItems[slideshowIndex];if(!target||!item)return;let media="";
+    if(item.photo){const url=URL.createObjectURL(item.photo);urls.push(url);media=`<img class="mobile-slide-photo" src="${url}" alt="">`;}
+    if(item.blob){const url=URL.createObjectURL(item.blob);urls.push(url);media=`<audio controls src="${url}" style="width:100%"></audio>`;}
+    target.innerHTML=`<article class="mobile-slide">${media}<div>${item.icon||"✨"}</div><small>Memory ${slideshowIndex+1} of ${slideshowItems.length}</small><h1>${esc(item.title)}</h1><p>${esc(item.detail||"A meaningful part of this journey")}</p><time>${formatDate(item.date)}</time></article>`;
+  }
+  async function birthdayExport(type){
+    const data=BB.store.data,completed=Object.values(data.progress||{}).reduce((sum,value)=>sum+value,0),lines=[`Happy Birthday, ${profile().name}!`,`⭐ ${data.stars} stars earned`,`🌸 ${data.flowers} flowers grown`,`🦋 ${data.butterflies} butterflies earned`,`📚 ${completed} learning activities completed`,`💬 ${Object.keys(data.wordUse||{}).length} communication words explored`,`Look how much you’ve grown!`];
+    if(type==="pdf"){printHtml(lines[0],`<div style="text-align:center"><h1>${esc(lines[0])}</h1>${lines.slice(1).map(line=>`<p>${esc(line)}</p>`).join("")}</div>`);return;}
+    const canvas=document.createElement("canvas");canvas.width=1080;canvas.height=1350;const ctx=canvas.getContext("2d");ctx.fillStyle="#f7f1ff";ctx.fillRect(0,0,1080,1350);ctx.fillStyle="#7055b8";ctx.textAlign="center";ctx.font="bold 58px system-ui";ctx.fillText(lines[0],540,170);ctx.fillStyle="#24324a";ctx.font="36px system-ui";lines.slice(1).forEach((line,index)=>ctx.fillText(line,540,300+index*125));canvas.toBlob(blob=>downloadBlob(blob,`happy-birthday-${profile().name.replace(/[^a-z0-9]+/gi,"-")}.png`),"image/png");
+  }
+  async function keepsakeBook(){
+    const items=await letters();printHtml(`${profile().name} Keepsake Book`,`<div style="text-align:center;padding:60px 10px"><h1>💌 🌸 🎤</h1><h1>${esc(profile().name)}’s BrightBridge Keepsake Book</h1><p>Letters, memories, growth, and encouragement</p></div><h1>Letters</h1>${items.slice().reverse().map(item=>`<article><h2>💌 ${esc(item.title)}</h2><p>From ${esc(item.author||"Caregiver")} · ${formatDate(item.date)}</p>${sanitizeRichHtml(item.body||"")}</article>`).join("")||"<p>No letters yet.</p>"}`);
+  }
 
   function voiceMetadata(){
-    return {title:document.querySelector("[data-mv-title]")?.value.trim(),dateTime:document.querySelector("[data-mv-date]")?.value||new Date().toISOString(),age:document.querySelector("[data-mv-age]")?.value.trim(),notes:document.querySelector("[data-mv-notes]")?.value.trim(),milestone:!!document.querySelector("[data-mv-milestone]")?.checked};
+    const milestone=!!document.querySelector("[data-mv-milestone]")?.checked;
+    return {title:document.querySelector("[data-mv-title]")?.value.trim(),dateTime:document.querySelector("[data-mv-date]")?.value||new Date().toISOString(),age:document.querySelector("[data-mv-age]")?.value.trim(),notes:document.querySelector("[data-mv-notes]")?.value.trim(),tags:(document.querySelector("[data-mv-tags]")?.value||"").split(",").map(item=>item.trim()).filter(Boolean),milestone,milestoneLabel:document.querySelector("[data-mv-milestone-label]")?.value.trim()||(milestone?"Personal Achievement":""),favorite:!!document.querySelector("[data-mv-favorite]")?.checked,replay:!!document.querySelector("[data-mv-replay]")?.checked};
   }
   async function storeVoiceBlob(blob,duration=0){
     const meta=voiceMetadata();
     if(!meta.title){BB.app.toast("Add a recording title first.");return;}
-    await saveVoice({...meta,id:`voice-${Date.now()}`,profileId:BB.store.data.activeProfile,createdAt:new Date().toISOString(),duration,blob});
+    const record={...meta,id:`voice-${Date.now()}`,profileId:BB.store.data.activeProfile,createdAt:new Date().toISOString(),duration,blob};await saveVoice(record);
+    track("voice","First Voice Journey recording",{icon:"🎤",detail:record.title,onceKey:"first-voice"});if(record.milestone)track("milestone",record.milestoneLabel,{icon:"🏆",detail:record.title,onceKey:`milestone-${record.id}`});
     BB.app.toast("Voice Journey memory saved.");open("voice");
   }
   async function startVoiceRecording(){
@@ -206,15 +314,36 @@
     if(event.target.closest("[data-mv-record]")){startVoiceRecording();return;}
     if(event.target.closest("[data-mv-stop]")){stopVoiceRecording();return;}
     const voiceDelete=event.target.closest("[data-mv-delete]");if(voiceDelete&&confirm("Delete this private Voice Journey recording?")){await removeVoice(voiceDelete.dataset.mvDelete);open("voice");return;}
-    if(event.target.closest("[data-ml-save]")){const title=document.querySelector("[data-ml-title]")?.value.trim(),author=document.querySelector("[data-ml-author]")?.value.trim(),body=document.querySelector("[data-ml-body]")?.value.trim();if(!title||!body){BB.app.toast("Add a title and letter message.");return;}await privateStore("letters","readwrite",store=>store.put({id:`letter-${Date.now()}`,profileId:BB.store.data.activeProfile,title,author:author||"Caregiver",body,date:new Date().toISOString()}));BB.app.toast("Private letter saved.");open("letters");return;}
+    const voiceFavorite=event.target.closest("[data-mv-favorite]");if(voiceFavorite){const item=await voiceStore("readonly",store=>store.get(voiceFavorite.dataset.mvFavorite));if(item){item.favorite=!item.favorite;await saveVoice(item);open("voice");}return;}
+    const voiceDownload=event.target.closest("[data-mv-download]");if(voiceDownload){const item=await voiceStore("readonly",store=>store.get(voiceDownload.dataset.mvDownload));if(item)downloadBlob(item.blob,`${item.title.replace(/[^a-z0-9]+/gi,"-")||"voice-memory"}.webm`);return;}
+    const printRecord=event.target.closest("[data-memory-print-record]");if(printRecord){printSummary("record",printRecord.dataset.memoryPrintRecord);return;}
+    if(event.target.closest("[data-mv-export-all]")){exportAudioZip();return;}
+    if(event.target.closest("[data-mv-export-selected]")){exportAudioZip(true);return;}
+    if(event.target.closest("[data-mv-compare]")){const items=await voices(),left=items.find(item=>item.id===document.querySelector("[data-mv-compare-left]")?.value),right=items.find(item=>item.id===document.querySelector("[data-mv-compare-right]")?.value),target=document.querySelector("#mobile-comparison");if(left&&right&&target){revokeUrls();target.innerHTML=comparisonCard(left,"Recording one")+comparisonCard(right,"Recording two");}return;}
+    const printButton=event.target.closest("[data-memory-print]");if(printButton){printSummary(printButton.dataset.memoryPrint);return;}
+    if(event.target.closest("[data-memory-slideshow]")){showSlideshow();return;}
+    if(event.target.closest("[data-slide-next]")){slideshowIndex=(slideshowIndex+1)%slideshowItems.length;renderSlide();return;}
+    if(event.target.closest("[data-slide-prev]")){slideshowIndex=(slideshowIndex-1+slideshowItems.length)%slideshowItems.length;renderSlide();return;}
+    if(event.target.closest("[data-keepsake-book]")){keepsakeBook();return;}
+    const letterPrint=event.target.closest("[data-ml-print]");if(letterPrint){const item=(await letters()).find(letter=>letter.id===letterPrint.dataset.mlPrint);if(item)printHtml(item.title,`<h1>${esc(item.title)}</h1><p>${formatDate(item.date)} · Age ${esc(item.age||"not added")}</p><p><strong>From ${esc(item.author||"Caregiver")}</strong></p>${sanitizeRichHtml(item.body||"")}<p><em>Future reading choice: ${esc(item.unlockRule||"Read Anytime")}</em></p>`);return;}
+    const formatButton=event.target.closest("[data-ml-format]");if(formatButton){document.execCommand(formatButton.dataset.mlFormat,false);document.querySelector("[data-ml-body]")?.focus();return;}
+    if(event.target.closest("[data-ml-save]")){const title=document.querySelector("[data-ml-title]")?.value.trim(),author=document.querySelector("[data-ml-author]")?.value.trim(),body=sanitizeRichHtml(document.querySelector("[data-ml-body]")?.innerHTML||""),photo=document.querySelector("[data-ml-photo]")?.files[0]||null,voiceId=document.querySelector("[data-ml-voice]")?.value||"",voiceItem=(await voices()).find(item=>item.id===voiceId);if(!title||!body.replace(/<[^>]+>/g,"").trim()){BB.app.toast("Add a title and letter message.");return;}if(photo&&(!photo.type.startsWith("image/")||photo.size>8*1024*1024)){BB.app.toast("Choose a photo smaller than 8 MB.");return;}await privateStore("letters","readwrite",store=>store.put({id:`letter-${Date.now()}`,profileId:BB.store.data.activeProfile,title,author:author||"Caregiver",body,date:document.querySelector("[data-ml-date]")?.value||new Date().toISOString(),age:document.querySelector("[data-ml-age]")?.value.trim(),unlockRule:document.querySelector("[data-ml-unlock]")?.value||"Read Anytime",memories:(document.querySelector("[data-ml-memories]")?.value||"").split(",").map(item=>item.trim()).filter(Boolean),voiceId,voiceTitle:voiceItem?.title||"",dayReplay:document.querySelector("[data-ml-day]")?.value.trim()||"",gardenSnapshot:document.querySelector("[data-ml-garden]")?.checked?{flowers:BB.store.data.flowers,butterflies:BB.store.data.butterflies,stars:BB.store.data.stars}:null,photo,createdAt:new Date().toISOString()}));BB.app.toast("Private letter saved.");open("letters");return;}
     const letterDelete=event.target.closest("[data-ml-delete]");if(letterDelete&&confirm("Delete this private letter?")){try{await privateStore("letters","readwrite",store=>store.delete(letterDelete.dataset.mlDelete));}catch{}state().mobileLetters=state().mobileLetters.filter(item=>item.id!==letterDelete.dataset.mlDelete);BB.store.save();open("letters");return;}
     const stage=event.target.closest("[data-mg-stage]");if(stage){growth().stage=stage.dataset.mgStage;BB.store.save();applyGrowthPath();BB.app.toast("Growth stage updated. All history was preserved.");open("growth");return;}
     const feature=event.target.closest("[data-mg-feature]");if(feature){const key=feature.dataset.mgFeature;growth().enabledFeatures[key]=!growth().enabledFeatures[key];BB.store.save();applyGrowthPath();open("growth");return;}
+    const toggle=event.target.closest("[data-mg-toggle]");if(toggle){const key=toggle.dataset.mgToggle;growth()[key]=!growth()[key];BB.store.save();applyGrowthPath();open("growth");return;}
+    const preview=event.target.closest("[data-mg-preview]");if(preview){const item=stages.find(stage=>stage.id===preview.dataset.mgPreview);BB.app.modal(`<div class="mobile-modal-head"><h2>${item.icon} ${item.name}</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p><strong>${item.ages}</strong></p><p>${item.focus}</p><p class="muted">Preview only. No stage or memory was changed.</p>`,"Growth Path preview");return;}
+    const birthday=event.target.closest("[data-birthday-export]");if(birthday){birthdayExport(birthday.dataset.birthdayExport);return;}
   });
-  document.addEventListener("change",event=>{if(event.target.matches("[data-mv-upload]")&&event.target.files[0]){const meta=voiceMetadata();if(!meta.title){BB.app.toast("Add a recording title first.");event.target.value="";return;}const file=event.target.files[0];if(!file.type.startsWith("audio/")||file.size>15*1024*1024){BB.app.toast("Choose an audio file smaller than 15 MB.");event.target.value="";return;}storeVoiceBlob(file,0);}});
+  document.addEventListener("input",event=>{if(event.target.matches("[data-mv-search]")){voiceQuery=event.target.value;clearTimeout(event.target._searchTimer);event.target._searchTimer=setTimeout(()=>open("voice"),250);}});
+  document.addEventListener("change",event=>{
+    if(event.target.matches("[data-mv-upload]")&&event.target.files[0]){const meta=voiceMetadata();if(!meta.title){BB.app.toast("Add a recording title first.");event.target.value="";return;}const file=event.target.files[0];if(!file.type.startsWith("audio/")||file.size>25*1024*1024){BB.app.toast("Choose an audio file smaller than 25 MB.");event.target.value="";return;}storeVoiceBlob(file,0);}
+    if(event.target.matches("[data-mv-sort]")){voiceSort=event.target.value;open("voice");}
+    if(event.target.matches("[data-mg-birthday]")){profile().birthDate=event.target.value;BB.store.save();}
+  });
   window.addEventListener("bb:state",applyGrowthPath);
   window.BB=window.BB||{};
-  BB.memoryJourney={open,cancelView,track,applyGrowthPath,stageVocabulary,homeBanner,clear};
+  BB.memoryJourney={open,cancelView,track,applyGrowthPath,stageVocabulary,homeBanner,exportAll,importAll,clear};
   applyGrowthPath();
 })();
 
@@ -224,7 +353,7 @@
   const view=document.querySelector("#view");
   const modalRoot=document.querySelector("#modal-root");
   const toastRoot=document.querySelector("#toast-root");
-  const learningIds=["alphabet","numbers","colors","shapes","matching","puzzles","emotions"];
+  const learningIds=["alphabet","phonics","numbers","counting","colors","shapes","patterns","animals","food","naturelearn","vehicles","weather","bodyparts","helpers","sorting","matching","tracing","memorygame","puzzles","emotions","lifeskills","employment","community","money","advocacy","wellness"];
   const aac={
     Quick:[["I want","☝️"],["I need","🙋"],["More","➕"],["All done","✅"],["Yes","👍"],["No","👎"],["Please","💜"],["Thank you","🌟"]],
     Food:[["Apple","🍎"],["Banana","🍌"],["Sandwich","🥪"],["Crackers","🍘"],["Yogurt","🥣"],["Hungry","😋"]],
@@ -236,8 +365,9 @@
     Animals:[["Dog","🐶"],["Cat","🐱"],["Bird","🐦"],["Fish","🐠"],["Horse","🐴"],["Animal","🐾"]],
     School:[["Teacher","🧑‍🏫"],["School","🏫"],["Book","📖"],["Pencil","✏️"],["Friend","🧑‍🤝‍🧑"],["My turn","☝️"]],
     Medical:[["Doctor","🩺"],["Medicine","💊"],["My head hurts","🤕"],["My tummy hurts","🤢"],["Bandage","🩹"],["Emergency","🚑"]],
-    Transport:[["Car","🚗"],["Bus","🚌"],["Train","🚆"],["Bike","🚲"],["Go","🟢"],["Stop","🛑"]]
+    Transportation:[["Car","🚗"],["Bus","🚌"],["Train","🚆"],["Bike","🚲"],["Go","🟢"],["Stop","🛑"]]
   };
+  const spanishWords={"I want":"Quiero","I need":"Necesito","More":"Más","All done":"Terminé","Yes":"Sí","No":"No","Please":"Por favor","Thank you":"Gracias","Apple":"Manzana","Banana":"Plátano","Sandwich":"Sándwich","Crackers":"Galletas","Yogurt":"Yogur","Hungry":"Tengo hambre","Water":"Agua","Milk":"Leche","Juice":"Jugo","Thirsty":"Tengo sed","Cup":"Vaso","Bathroom":"Baño","Toilet":"Inodoro","Wash hands":"Lavar las manos","Help please":"Ayuda, por favor","Wet":"Mojado","Help":"Ayuda","Stop":"Alto","Break":"Descanso","Too loud":"Demasiado fuerte","It hurts":"Me duele","I don't know":"No sé","Happy":"Feliz","Sad":"Triste","Angry":"Enojado","Calm":"Tranquilo","Scared":"Asustado","Tired":"Cansado","Excited":"Emocionado","Mom":"Mamá","Dad":"Papá","Grandma":"Abuela","Grandpa":"Abuelo","Brother":"Hermano","Sister":"Hermana","Home":"Casa","Dog":"Perro","Cat":"Gato","Bird":"Pájaro","Fish":"Pez","Horse":"Caballo","Animal":"Animal","Teacher":"Maestro","School":"Escuela","Book":"Libro","Pencil":"Lápiz","Friend":"Amigo","My turn":"Mi turno","Doctor":"Doctor","Medicine":"Medicina","My head hurts":"Me duele la cabeza","My tummy hurts":"Me duele el estómago","Bandage":"Venda","Emergency":"Emergencia","Car":"Carro","Bus":"Autobús","Train":"Tren","Bike":"Bicicleta","Go":"Ir","Again please":"Otra vez, por favor","Look with me":"Mira conmigo","My favorite":"Mi favorito","I can read":"Puedo leer","What comes next?":"¿Qué sigue?","I need a schedule":"Necesito un horario","I have a goal":"Tengo una meta","I need more time":"Necesito más tiempo","Can you explain?":"¿Puedes explicar?","I can speak up for myself":"Puedo defenderme","I need transportation":"Necesito transporte","My future goal":"Mi meta futura"};
   const feelings=[["Happy","😊","I feel bright and happy."],["Sad","😢","I may want comfort."],["Angry","😠","I can pause and breathe."],["Calm","😌","My body feels quiet."],["Scared","😨","I can find a safe grown-up."],["Tired","😴","My body may need rest."],["Excited","🤩","I have lots of happy energy."],["Frustrated","😣","I can take a break and try later."]];
   const settingsRows={
     speech:["Family voice playback","Use saved caregiver recordings"],
@@ -247,7 +377,10 @@
     highContrast:["High contrast","Make borders stand out"],
     largeText:["Large text","Increase words and controls"],
     reducedMotion:["Reduce motion","Keep transitions still"],
-    simpleMode:["Simple mode","Show fewer choices"]
+    simpleMode:["Simple mode","Show fewer choices"],
+    colorFriendly:["Color-friendly palette","Use patterns and stronger shape cues"],
+    offlineMode:["Offline mode","Keep core activities ready without internet"],
+    notifications:["Notifications","Optional caregiver-approved reminders"]
   };
 
   let route="home";
@@ -265,10 +398,16 @@
   let cardIndex=0;
   let roundIndex=0;
   let quizLocked=false;
+  let quizAttempts=0;
   let currentRoutine="Brush teeth";
   let completedSteps=new Set();
   let socialIndex=0;
   let instrument="piano";
+  let installPrompt=null;
+  let sensoryMode="bubbles";
+  const sensoryExperiences={
+    bubbles:["🫧","Bubbles","Tap to make and pop bubbles."],rainbow:["🌈","Rainbow Draw","Drag a colorful trail."],water:["💧","Water Ripples","Tap to make gentle ripples."],balloons:["🎈","Balloons","Tap to float a balloon."],leaves:["🍃","Leaves","Fill the space with drifting leaves."],snow:["❄️","Snow","Make quiet snowflakes."],stars:["⭐","Stars","Light up a calm night sky."],paint:["🎨","Magic Paint","Drag to add soft color."],fireflies:["✨","Fireflies","Create tiny glowing lights."],ocean:["🌊","Ocean Waves","Make peaceful ocean waves."]
+  };
 
   function esc(value=""){
     return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
@@ -293,10 +432,10 @@
     toast._timer=setTimeout(()=>toastRoot.innerHTML="",3000);
   }
 
-  function pip(message,mood="😊",speak=false){
+  function pip(message,mood="😊",voicePhrase=""){
     document.querySelector("#pip-expression").textContent=mood;
     document.querySelector("#pip-bubble").textContent=message;
-    if(speak)BB.speech.speak(message);
+    if(voicePhrase)BB.speech.speak(voicePhrase);
   }
 
   function modal(content,label){
@@ -330,7 +469,7 @@
     render(options);
     document.querySelectorAll(".mobile-bottom-nav [data-route]").forEach(button=>{
       const navRoute=button.dataset.route;
-      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","parent","settings"].includes(route)));
+      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","tools","parent","settings"].includes(route)));
     });
     view.focus({preventScroll:true});
     resetPageScroll();
@@ -343,7 +482,7 @@
       flashcards:()=>renderFlashcards(options),quiz:()=>renderQuiz(options),
       calm:renderCalm,music:renderMusic,nature:renderNature,daily:renderDaily,
       social:renderSocial,rewards:renderRewards,progress:renderProgress,
-      more:renderMore,parent:renderParent,settings:renderSettings,
+      more:renderMore,tools:()=>BB.mobileTools.render(),parent:renderParent,settings:renderSettings,
       memory:()=>`${pageHead("Private Memory Studio","Opening the selected caregiver feature…","parent")}<div class="mobile-panel">💜 Gathering private memories…</div>`
     };
     view.innerHTML=(screens[route]||renderHome)();
@@ -351,6 +490,8 @@
     BB.store.save();
     if(route==="communication"&&voiceSetup)setTimeout(refreshVoiceList,0);
     if(route==="calm")setupSensory();
+    if(route==="flashcards"&&currentGame?.id==="tracing")setupTracing();
+    if(route==="tools")BB.mobileTools.afterRender();
     if(route==="memory")BB.memoryJourney.open(options.section||"hub",{withinRoute:true});
   }
 
@@ -374,14 +515,17 @@
 
   function communicationItems(){
     const growthWords=BB.memoryJourney?.stageVocabulary?.()||[];
-    if(category==="Favorites")return [...Object.values(aac).flat(),...growthWords].filter(([word])=>BB.store.data.favorites.includes(word));
-    if(category==="Growth Path")return growthWords;
-    return aac[category]||aac.Quick;
+    let items;
+    if(category==="Favorites")items=[...Object.values(aac).flat(),...growthWords].filter(([word])=>BB.store.data.favorites.includes(word)||BB.store.data.favorites.includes(spanishWords[word]));
+    else if(category==="Recent"){const all=[...Object.values(aac).flat(),...growthWords];items=BB.store.data.recentWords.map(word=>all.find(item=>item[0]===word||spanishWords[item[0]]===word)||[word,"💬"]);}
+    else if(category==="Growth Path")items=growthWords;
+    else items=aac[category]||aac.Quick;
+    return BB.store.data.settings.language==="es-US"?items.map(([word,icon])=>[spanishWords[word]||word,icon]):items;
   }
 
   function renderCommunication(){
     const items=communicationItems();
-    const categories=[...Object.keys(aac),"Growth Path","Favorites"];
+    const categories=[...Object.keys(aac),"Growth Path","Favorites","Recent"];
     return `<section>
       ${pageHead("Communication","Tap cards to build the sentence exactly as written.")}
       <div class="mobile-voice-banner"><div><strong>🎙️ Family Voice Cards</strong><small>Caregivers record directly on the matching card.</small></div><button type="button" data-action="voice-setup">${voiceSetup?"Done":"Set up"}</button></div>
@@ -393,8 +537,9 @@
   }
 
   function renderLearning(){
+    const stage=BB.store.data.profiles.find(item=>item.id===BB.store.data.activeProfile)?.growthPath?.stage||"early-explorer",limits={"early-explorer":10,"growing-learner":16,"independent-communicator":20,"teen-young-adult":26},ids=learningIds.slice(0,BB.store.data.settings.simpleMode?8:limits[stage]||20);
     return `<section>${pageHead("Learning Adventures","Choose cards to explore or play a gentle challenge.")}
-      <div class="mobile-list">${learningIds.map(id=>{const game=BB.games[id];return `<article class="mobile-list-card" style="--soft:${game.color}"><span>${game.icon}</span><div><strong>${esc(game.title)}</strong><small>${esc(game.description)}</small></div><div><button class="mobile-button secondary" type="button" data-cards="${id}">Cards</button><button class="mobile-button" type="button" data-play="${id}">Play</button></div></article>`;}).join("")}</div>
+      <div class="mobile-list">${ids.map(id=>{const game=BB.games[id];return `<article class="mobile-list-card" style="--soft:${game.color}"><span>${game.icon}</span><div><strong>${esc(game.title)}</strong><small>${esc(game.description)}</small></div><div><button class="mobile-button secondary" type="button" data-cards="${id}">Cards</button><button class="mobile-button" type="button" data-play="${id}">Play</button></div></article>`;}).join("")}</div>
     </section>`;
   }
 
@@ -404,12 +549,13 @@
     const card=currentGame.cards[cardIndex];
     return `<section>${pageHead(currentGame.title,`Card ${cardIndex+1} of ${currentGame.cards.length}`,"learning")}
       <div class="mobile-flashcard"><div><div class="mobile-flash-symbol">${card.symbol}</div><div class="mobile-flash-word">${esc(card.word)}</div><p>${card.emoji} ${esc(card.detail)}</p></div></div>
+      ${currentGame.id==="tracing"?`<div class="mobile-panel"><h3>Trace with your finger</h3><canvas class="mobile-trace-pad" data-trace-canvas width="700" height="360" aria-label="Tracing drawing pad"></canvas><button class="mobile-button secondary mobile-wide-button" type="button" data-action="trace-clear">Clear drawing</button></div>`:""}
       <div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-action="card-prev">← Back</button><button class="mobile-button" type="button" data-action="card-hear">🔊 Hear</button><button class="mobile-button secondary" type="button" data-action="card-next">Next →</button></div>
     </section>`;
   }
 
   function renderQuiz(options={}){
-    if(options.game){currentGame=BB.games[options.game];roundIndex=0;quizLocked=false;}
+    if(options.game){currentGame=BB.games[options.game];roundIndex=0;quizLocked=false;quizAttempts=0;}
     if(!currentGame)return renderLearning();
     const round=currentGame.rounds[roundIndex];
     return `<section>${pageHead(currentGame.title,`Challenge ${roundIndex+1} of ${currentGame.rounds.length}`,"learning")}
@@ -419,9 +565,10 @@
   }
 
   function renderCalm(){
+    const experience=sensoryExperiences[sensoryMode];
     return `<section>${pageHead("Feelings & Calm","Name a feeling, breathe, or gently pop bubbles.")}
       <div class="mobile-feelings">${feelings.map(([name,icon,detail])=>`<button class="mobile-feeling" type="button" data-feeling="${esc(name)}|${esc(detail)}"><span>${icon}</span>${esc(name)}</button>`).join("")}</div>
-      <div class="mobile-section-title"><h2>Quiet bubble play</h2></div><div class="mobile-sensory" data-sensory aria-label="Tap to make calming bubbles"></div>
+      <div class="mobile-section-title"><h2>Sensory Play</h2><small>No score · explore freely</small></div><div class="mobile-category-row">${Object.entries(sensoryExperiences).map(([id,[icon,label]])=>`<button class="mobile-chip ${id===sensoryMode?"active":""}" type="button" data-sensory-mode="${id}">${icon} ${label}</button>`).join("")}</div><div class="mobile-sensory mode-${sensoryMode}" data-sensory aria-label="${esc(experience[2])}"><p>${experience[0]} ${esc(experience[2])}</p></div>
       <div class="mobile-button-row" style="margin-top:12px"><button class="mobile-button" type="button" data-action="breathe">☁️ Breathe with Pip</button></div>
     </section>`;
   }
@@ -464,6 +611,7 @@
     return `<section>${pageHead("Reward Garden","Every effort helps your own garden grow.","more")}
       <div class="mobile-garden"><h2>Your garden</h2><div class="mobile-garden-items">${Array.from({length:Math.min(6,data.flowers)},()=>"<span>🌻</span>").join("")||"<span>🌱</span>"}${Array.from({length:Math.min(4,data.butterflies)},()=>"<span>🦋</span>").join("")}</div></div>
       <div class="mobile-stats" style="margin-top:12px"><div class="mobile-stat"><strong>⭐ ${data.stars}</strong><span>Stars</span></div><div class="mobile-stat"><strong>🌻 ${data.flowers}</strong><span>Flowers</span></div><div class="mobile-stat"><strong>🦋 ${data.butterflies}</strong><span>Butterflies</span></div><div class="mobile-stat"><strong>🎟️ ${data.stickers.length}</strong><span>Stickers</span></div></div>
+      <div class="mobile-panel" style="margin-top:13px"><h2>Sticker Collection</h2><div class="mobile-sticker-row">${data.stickers.length?data.stickers.map(item=>`<span>${item}</span>`).join(""):"<p>Your first sticker is waiting for your fourth star.</p>"}</div><h2>Achievements</h2><div class="mobile-list">${BB.rewards.achievements.map(item=>`<div class="mobile-list-card ${data.achievements.includes(item.id)?"done":""}"><span>${data.achievements.includes(item.id)?item.icon:"🔒"}</span><div><strong>${item.name}</strong><small>${data.achievements.includes(item.id)?"Earned through personal progress":"Keep exploring"}</small></div></div>`).join("")}</div></div>
     </section>`;
   }
 
@@ -484,18 +632,20 @@
       ["nature","🦋","Nature","Oceans, gardens, and space","#ddf5ed"],
       ["rewards","🌻","Reward Garden","Celebrate effort","#fff0bd"],
       ["progress","📈","My Progress","Personal growth only","#ddf5ed"],
+      ["tools","🧰","My Tools","Schedules, choices, photos, and guided mode","#e5f2ff"],
       ["settings","⚙️","Comfort Settings","Sound, text, and motion","#e9efff"],
+      ["install","📲","Install BrightBridge","Keep the app on this device","#fff0c9"],
       ["parent","🔒","Grown-up Area","Private caregiver controls","#ececf2"]
     ];
     return `<section>${pageHead("More to Explore","Activities and caregiver tools.")}
-      <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
+      <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" ${id==="install"?'data-action="install"':`data-route="${id}"`}><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
   }
 
   function renderParent(){
     if(!parentUnlocked){
       setTimeout(()=>showPin(),0);
-      return `<section>${pageHead("Grown-up Area","A parent PIN protects these private controls.","more")}<div class="mobile-panel" style="text-align:center"><div style="font-size:65px">🔒</div><h2>Grown-up check needed</h2><button class="mobile-button" type="button" data-action="open-pin">Enter PIN</button><p class="muted">Starter PIN: 2468</p></div></section>`;
+      return `<section>${pageHead("Grown-up Area","A parent PIN protects these private controls.","more")}<div class="mobile-panel" style="text-align:center"><div style="font-size:65px">🔒</div><h2>Grown-up check needed</h2><button class="mobile-button" type="button" data-action="open-pin">Enter PIN</button>${BB.store.data.settings.parentPin==="2468"?'<p class="muted">Starter PIN: 2468</p>':""}</div></section>`;
     }
     const data=BB.store.data,profile=activeProfile();
     return `<section>${pageHead("Parent Dashboard",`Private controls for ${profile.name}.`,"more")}
@@ -505,9 +655,11 @@
       <div class="mobile-setting-group" style="margin-top:13px"><h3>👤 Child profile</h3>
         <label class="mobile-setting-row"><span><strong>Active profile</strong></span><select data-profile>${data.profiles.map(item=>`<option value="${esc(item.id)}" ${item.id===data.activeProfile?"selected":""}>${item.avatar} ${esc(item.name)}</option>`).join("")}</select></label>
         <label class="mobile-setting-row"><span><strong>Display name</strong></span><input data-profile-name value="${esc(profile.name)}" maxlength="30"></label>
+        <label class="mobile-setting-row"><span><strong>Birthday</strong><small>Used only for caregiver-controlled celebrations and age suggestions</small></span><input type="date" data-profile-birthday value="${esc(profile.birthDate||"")}"></label>
+        <div class="mobile-setting-row"><span><strong>Profiles</strong><small>Create a separate private journey for another child.</small></span><button class="mobile-button secondary" type="button" data-action="add-profile">Add</button></div>
         <div class="mobile-setting-row"><span><strong>Family Voice Cards</strong><small>Record beside exact cards in Communication.</small></span><button class="mobile-button secondary" type="button" data-route="communication">Open</button></div>
       </div>
-      <div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-action="change-pin">Change PIN</button><button class="mobile-button secondary" type="button" data-action="export">Export progress</button><button class="mobile-button danger" type="button" data-action="reset">Reset</button></div>
+      <div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-route="tools">Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">Lock area</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">Delete profile</button>`:""}<button class="mobile-button secondary" type="button" data-action="export">Export progress</button><button class="mobile-button danger" type="button" data-action="reset">Reset</button></div>
     </section>`;
   }
 
@@ -517,7 +669,10 @@
       <div class="mobile-setting-group"><h3>Sound & appearance</h3>${Object.entries(settingsRows).map(([key,[title,detail]])=>`<div class="mobile-setting-row"><span><strong>${title}</strong><small>${detail}</small></span><button class="mobile-switch ${settings[key]?"on":""}" type="button" role="switch" aria-checked="${settings[key]}" data-setting="${key}"><i></i></button></div>`).join("")}
         <label class="mobile-setting-row mobile-range-row"><span><strong>Family voice volume</strong><small>Caregiver recordings and communication cards</small></span><input type="range" min="0" max="1" step=".05" value="${settings.speechVolume}" data-range="speechVolume"></label>
         <label class="mobile-setting-row mobile-range-row"><span><strong>Effects volume</strong><small>Success and try-again sounds</small></span><input type="range" min="0" max="1" step=".05" value="${settings.effectsVolume}" data-range="effectsVolume"></label>
-      </div><p class="muted">🔒 Activity stays on this device. No ads and no tracking.</p>
+        <label class="mobile-setting-row mobile-range-row"><span><strong>Caregiver voice speed</strong><small>Used when supported by recorded audio playback</small></span><input type="range" min=".6" max="1.25" step=".05" value="${settings.speechRate}" data-range="speechRate"></label>
+        <label class="mobile-setting-row mobile-range-row"><span><strong>Music volume</strong></span><input type="range" min="0" max="1" step=".05" value="${settings.musicVolume}" data-range="musicVolume"></label>
+        <label class="mobile-setting-row mobile-range-row"><span><strong>Animation speed</strong></span><input type="range" min=".5" max="1.5" step=".1" value="${settings.animationSpeed}" data-range="animationSpeed"></label>
+      </div><div class="mobile-setting-group"><h3>Learning preferences</h3><label class="mobile-setting-row"><span><strong>Language</strong></span><select data-setting-select="language"><option value="en-US" ${settings.language==="en-US"?"selected":""}>English (US)</option><option value="en-GB" ${settings.language==="en-GB"?"selected":""}>English (UK)</option><option value="es-US" ${settings.language==="es-US"?"selected":""}>Español</option></select></label><label class="mobile-setting-row"><span><strong>Difficulty</strong></span><select data-setting-select="difficulty"><option value="starter" ${settings.difficulty==="starter"?"selected":""}>Starter</option><option value="growing" ${settings.difficulty==="growing"?"selected":""}>Growing</option><option value="independent" ${settings.difficulty==="independent"?"selected":""}>Independent</option></select></label></div><button class="mobile-button mobile-wide-button" type="button" data-action="install">Install BrightBridge</button><p class="muted">🔒 Activity stays on this device. No ads and no tracking.</p>
     </section>`;
   }
 
@@ -525,7 +680,7 @@
     if(parentUnlocked){success?.();return;}
     if(modalRoot.innerHTML)return;
     pinSuccess=success;
-    modal(`<div class="mobile-modal-head"><h2>Grown-up check</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Tap the four-digit parent PIN.</p><input class="pin-entry" type="password" inputmode="numeric" maxlength="4" data-pin aria-label="Parent PIN"><div class="pin-dots" data-pin-dots>○ ○ ○ ○</div><div class="pin-keypad">${["1","2","3","4","5","6","7","8","9","clear","0","back"].map(key=>`<button type="button" data-pin-key="${key}">${key==="back"?"⌫":key==="clear"?"Clear":key}</button>`).join("")}</div><button class="mobile-button pin-continue" type="button" data-action="verify-pin">Continue</button><p class="muted">Starter PIN: 2468</p>`,"Parent PIN");
+    modal(`<div class="mobile-modal-head"><h2>Grown-up check</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Tap the four-digit parent PIN.</p><input class="pin-entry" type="password" inputmode="numeric" maxlength="4" data-pin aria-label="Parent PIN"><div class="pin-dots" data-pin-dots>○ ○ ○ ○</div><div class="pin-keypad">${["1","2","3","4","5","6","7","8","9","clear","0","back"].map(key=>`<button type="button" data-pin-key="${key}">${key==="back"?"⌫":key==="clear"?"Clear":key}</button>`).join("")}</div><button class="mobile-button pin-continue" type="button" data-action="verify-pin">Continue</button>${BB.store.data.settings.parentPin==="2468"?'<p class="muted">Starter PIN: 2468</p>':""}`,"Parent PIN");
   }
 
   function updatePin(){
@@ -618,24 +773,36 @@
     if(quizLocked)return;
     const round=currentGame.rounds[roundIndex];
     if(index!==round.answer){
-      document.querySelectorAll("[data-answer]").forEach((button,i)=>{if(i===index)button.classList.add("tried");if(i===round.answer)button.classList.add("hint");});
-      BB.audio.tryAgain();pip("Good try. Look for the highlighted answer and try again.","🙂");return;
+      quizAttempts++;const difficulty=BB.store.data.settings.difficulty||"starter",promptLevel=BB.mobileTools.promptLevel();document.querySelectorAll("[data-answer]").forEach((button,i)=>{if(i===index)button.classList.add("tried");if(i===round.answer&&(difficulty==="starter"||promptLevel==="full"||(difficulty==="growing"&&quizAttempts>=2)))button.classList.add("hint");});
+      BB.audio.tryAgain();pip("Good try. Look for the highlighted answer and try again.","🙂","Try again");return;
     }
     quizLocked=true;BB.audio.success();BB.rewards.earn(currentGame.title);BB.rewards.recordProgress(currentGame.id);
     BB.memoryJourney?.track("learning","First learning activity completed",{icon:"📚",detail:currentGame.title,onceKey:"first-learning"});
     const target=document.querySelector("#quiz-result");
     target.innerHTML=`<div class="mobile-success"><div>🥳</div><h2>You found it!</h2><p>${esc(round.fact)}</p><button class="mobile-button" type="button" data-action="quiz-next">${roundIndex===currentGame.rounds.length-1?"Finish":"Next"}</button></div>`;
-    updateHeader();pip(`Yes! ${round.fact}`,"🥳");
+    updateHeader();pip(`Yes! ${round.fact}`,"🥳","Great job!");
   }
 
   function setupSensory(){
     const stage=document.querySelector("[data-sensory]");
     if(!stage)return;
-    stage.addEventListener("pointerdown",event=>{
+    let drawing=false;
+    const addEffect=event=>{
       const rect=stage.getBoundingClientRect(),bubble=document.createElement("span"),size=35+Math.random()*55;
-      bubble.className="mobile-bubble";bubble.style.width=`${size}px`;bubble.style.height=`${size}px`;bubble.style.left=`${Math.max(0,event.clientX-rect.left-size/2)}px`;bubble.style.top=`${Math.max(0,event.clientY-rect.top-size/2)}px`;
+      const icons={balloons:"🎈",leaves:"🍃",snow:"❄️",stars:"⭐",fireflies:"✨",ocean:"🌊"};
+      bubble.className=`mobile-bubble sensory-${sensoryMode}`;bubble.style.width=`${size}px`;bubble.style.height=`${size}px`;bubble.style.left=`${Math.max(0,event.clientX-rect.left-size/2)}px`;bubble.style.top=`${Math.max(0,event.clientY-rect.top-size/2)}px`;bubble.textContent=icons[sensoryMode]||"";if(["rainbow","paint"].includes(sensoryMode))bubble.style.background=`hsl(${Math.random()*360} 75% 72% / .72)`;
       stage.appendChild(bubble);BB.audio.pop();setTimeout(()=>bubble.remove(),1800);
-    });
+    };
+    stage.addEventListener("pointerdown",event=>{drawing=true;addEffect(event);stage.setPointerCapture?.(event.pointerId);});
+    stage.addEventListener("pointermove",event=>{if(drawing&&["rainbow","paint","water"].includes(sensoryMode))addEffect(event);});
+    stage.addEventListener("pointerup",()=>drawing=false);stage.addEventListener("pointercancel",()=>drawing=false);
+  }
+  function setupTracing(){
+    const canvas=document.querySelector("[data-trace-canvas]");if(!canvas)return;const context=canvas.getContext("2d");context.lineCap="round";context.lineJoin="round";context.lineWidth=18;context.strokeStyle="#7055b8";let drawing=false;
+    const point=event=>{const rect=canvas.getBoundingClientRect();return {x:(event.clientX-rect.left)*canvas.width/rect.width,y:(event.clientY-rect.top)*canvas.height/rect.height};};
+    canvas.addEventListener("pointerdown",event=>{drawing=true;const value=point(event);context.beginPath();context.moveTo(value.x,value.y);canvas.setPointerCapture?.(event.pointerId);});
+    canvas.addEventListener("pointermove",event=>{if(!drawing)return;const value=point(event);context.lineTo(value.x,value.y);context.stroke();});
+    canvas.addEventListener("pointerup",()=>drawing=false);canvas.addEventListener("pointercancel",()=>drawing=false);
   }
 
   function showBreathing(){
@@ -663,16 +830,17 @@
     const voicePlay=event.target.closest("[data-voice-play]");if(voicePlay){BB.voiceLibrary.play(voicePlay.dataset.voicePlay,BB.store.data.settings.speechVolume);return;}
     const voiceDelete=event.target.closest("[data-voice-delete]");if(voiceDelete){if(confirm("Delete this family voice recording?"))BB.voiceLibrary.remove(voiceDelete.dataset.voiceDelete).then(()=>{toast("Voice deleted");refreshVoiceList();});return;}
     const cards=event.target.closest("[data-cards]");if(cards){currentGame=BB.games[cards.dataset.cards];cardIndex=0;go("flashcards",{game:currentGame.id});return;}
-    const play=event.target.closest("[data-play]");if(play){currentGame=BB.games[play.dataset.play];roundIndex=0;quizLocked=false;go("quiz",{game:currentGame.id});return;}
+    const play=event.target.closest("[data-play]");if(play){currentGame=BB.games[play.dataset.play];roundIndex=0;quizLocked=false;quizAttempts=0;go("quiz",{game:currentGame.id});return;}
     const answer=event.target.closest("[data-answer]");if(answer){answerQuiz(Number(answer.dataset.answer));return;}
     const feeling=event.target.closest("[data-feeling]");if(feeling){const [name,detail]=feeling.dataset.feeling.split("|");BB.memoryJourney?.track("emotion","First emotion selected",{icon:"😊",detail:name,onceKey:"first-emotion"});pip(`${name}. ${detail}`,"😊");return;}
-    const instrumentButton=event.target.closest("[data-instrument]");if(instrumentButton){instrument=instrumentButton.dataset.instrument;view.innerHTML=renderMusic();return;}
-    const note=event.target.closest("[data-note]");if(note){BB.audio.note(Number(note.dataset.note),BB.games.music.instruments[instrument].type);return;}
+    const sensory=event.target.closest("[data-sensory-mode]");if(sensory){sensoryMode=sensory.dataset.sensoryMode;view.innerHTML=renderCalm();setupSensory();return;}
+    const instrumentButton=event.target.closest("[data-instrument]");if(instrumentButton){instrument=instrumentButton.dataset.instrument;view.innerHTML=renderMusic();BB.memoryJourney?.track("music","Favorite music discovered",{icon:"🎵",detail:BB.games.music.instruments[instrument].label,onceKey:`music-${instrument}`});return;}
+    const note=event.target.closest("[data-note]");if(note){BB.audio.note(Number(note.dataset.note),BB.games.music.instruments[instrument].type);BB.memoryJourney?.track("music","First musical note played",{icon:"🎵",detail:BB.games.music.instruments[instrument].label,onceKey:"first-music"});return;}
     const nature=event.target.closest("[data-nature]");if(nature){const scene=BB.games.nature.scenes.find(item=>item.id===nature.dataset.nature);modal(`<div class="mobile-modal-head"><h2>${scene.icon} ${esc(scene.label)}</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><div style="font-size:55px;text-align:center">${scene.items.join(" ")}</div><p>${esc(scene.fact)}</p><button class="mobile-button" type="button" data-action="close-modal">Done</button>`,scene.label);pip(scene.fact,"😊");return;}
     const routine=event.target.closest("[data-routine]");if(routine){currentRoutine=routine.dataset.routine;completedSteps=new Set();view.innerHTML=renderDaily();return;}
     const step=event.target.closest("[data-step]");if(step){const index=Number(step.dataset.step);completedSteps.add(index);BB.audio.pop();view.innerHTML=renderDaily();pip(`${BB.games.dailylife.routines[currentRoutine][index][1]}. Nice job!`,"😊");if(completedSteps.size===BB.games.dailylife.routines[currentRoutine].length){BB.rewards.earn(currentRoutine);updateHeader();pip("Routine complete! You followed every step.","🥳");}return;}
-    const social=event.target.closest("[data-social-answer]");if(social){const story=BB.games.socialskills.stories[socialIndex],index=Number(social.dataset.socialAnswer);if(index!==story.answer){social.classList.add("tried");document.querySelectorAll("[data-social-answer]")[story.answer]?.classList.add("hint");BB.audio.tryAgain();pip("Good try. Look for the kind and safe choice.","🙂");}else{BB.audio.success();BB.rewards.earn("Social skills");document.querySelector("#social-result").innerHTML=`<div class="mobile-success"><div>🤝</div><h2>Kind choice!</h2><p>${esc(story.fact)}</p><button class="mobile-button" type="button" data-action="social-next">Next</button></div>`;updateHeader();pip(story.fact,"🥳");}return;}
-    const setting=event.target.closest("[data-setting]");if(setting){const key=setting.dataset.setting;BB.store.data.settings[key]=!BB.store.data.settings[key];BB.store.save();BB.accessibility.apply();view.innerHTML=renderSettings();return;}
+    const social=event.target.closest("[data-social-answer]");if(social){const story=BB.games.socialskills.stories[socialIndex],index=Number(social.dataset.socialAnswer);if(index!==story.answer){social.classList.add("tried");document.querySelectorAll("[data-social-answer]")[story.answer]?.classList.add("hint");BB.audio.tryAgain();pip("Good try. Look for the kind and safe choice.","🙂","Try again");}else{BB.audio.success();BB.rewards.earn("Social skills");document.querySelector("#social-result").innerHTML=`<div class="mobile-success"><div>🤝</div><h2>Kind choice!</h2><p>${esc(story.fact)}</p><button class="mobile-button" type="button" data-action="social-next">Next</button></div>`;updateHeader();pip(story.fact,"🥳","Great job!");}return;}
+    const setting=event.target.closest("[data-setting]");if(setting){const key=setting.dataset.setting;BB.store.data.settings[key]=!BB.store.data.settings[key];if(key==="notifications"&&BB.store.data.settings[key]&&window.Notification?.permission==="default")Notification.requestPermission().then(permission=>{if(permission!=="granted"){BB.store.data.settings.notifications=false;BB.store.save();}});BB.store.save();BB.accessibility.apply();view.innerHTML=renderSettings();return;}
     const action=event.target.closest("[data-action]");if(!action)return;
     switch(action.dataset.action){
       case "repeat-pip":BB.speech.repeat();break;
@@ -680,10 +848,11 @@
       case "record-stop":stopRecording();break;
       case "sentence-clear":sentence="";refreshCommunication();break;
       case "sentence-speak":{const value=(document.querySelector("[data-sentence]")?.value||sentence).trim();sentence=value;if(value){speakExact(value);BB.store.data.recentPhrases.unshift(value);BB.store.data.recentPhrases=BB.store.data.recentPhrases.slice(0,20);BB.store.save();BB.memoryJourney?.track("communication","First sentence created",{icon:"💬",detail:value,onceKey:"first-sentence"});pip(value,"😊");}else toast("Add words to the sentence first.");break;}
-      case "card-prev":cardIndex=(cardIndex-1+currentGame.cards.length)%currentGame.cards.length;view.innerHTML=renderFlashcards();break;
-      case "card-next":cardIndex=(cardIndex+1)%currentGame.cards.length;view.innerHTML=renderFlashcards();break;
+      case "card-prev":cardIndex=(cardIndex-1+currentGame.cards.length)%currentGame.cards.length;view.innerHTML=renderFlashcards();if(currentGame.id==="tracing")setupTracing();break;
+      case "card-next":cardIndex=(cardIndex+1)%currentGame.cards.length;view.innerHTML=renderFlashcards();if(currentGame.id==="tracing")setupTracing();break;
       case "card-hear":{const card=currentGame.cards[cardIndex];speakExact(`${card.word}. ${card.detail}`);break;}
-      case "quiz-next":if(roundIndex===currentGame.rounds.length-1)go("learning");else{roundIndex++;quizLocked=false;view.innerHTML=renderQuiz();}break;
+      case "trace-clear":{const canvas=document.querySelector("[data-trace-canvas]");canvas?.getContext("2d").clearRect(0,0,canvas.width,canvas.height);break;}
+      case "quiz-next":if(roundIndex===currentGame.rounds.length-1)go("learning");else{roundIndex++;quizLocked=false;quizAttempts=0;view.innerHTML=renderQuiz();}break;
       case "breathe":showBreathing();break;
       case "calm-music":BB.audio.startCalmMusic();toast("Calm music started");break;
       case "stop-music":BB.audio.stopMusic();toast("Music stopped");break;
@@ -692,6 +861,10 @@
       case "verify-pin":verifyPin();break;
       case "change-pin":modal(`<div class="mobile-modal-head"><h2>Change parent PIN</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><input class="pin-entry" type="password" inputmode="numeric" maxlength="4" data-new-pin placeholder="New 4-digit PIN"><button class="mobile-button pin-continue" type="button" data-action="save-pin">Save PIN</button>`,"Change PIN");break;
       case "save-pin":{const value=document.querySelector("[data-new-pin]")?.value;if(/^\d{4}$/.test(value)){BB.store.data.settings.parentPin=value;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers.");break;}
+      case "lock-parent":parentUnlocked=false;toast("Grown-up Area locked");go("more",{replace:true});break;
+      case "install":if(installPrompt){installPrompt.prompt();installPrompt.userChoice.finally(()=>installPrompt=null);}else modal(`<div class="mobile-modal-head"><h2>Install BrightBridge</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Open your browser menu and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.</p><button class="mobile-button" type="button" data-action="close-modal">Got it</button>`,"Install BrightBridge");break;
+      case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();go("parent",{replace:true});break;}
+      case "delete-profile":{if(BB.store.data.profiles.length<2)break;if(confirm(`Delete ${activeProfile().name}'s profile? Private recordings must be deleted separately.`)){BB.store.data.profiles=BB.store.data.profiles.filter(item=>item.id!==BB.store.data.activeProfile);BB.store.data.activeProfile=BB.store.data.profiles[0].id;BB.store.save();go("parent",{replace:true});}break;}
       case "export":exportProgress();break;
       case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear()]).finally(()=>{BB.store.reset();parentUnlocked=false;go("home");});break;
       case "close-modal":closeModal();break;
@@ -708,20 +881,25 @@
 
   function handleChange(event){
     if(event.target.matches("[data-upload-card]"))uploadVoice(event.target);
+    if(event.target.matches("[data-profile-birthday]")){activeProfile().birthDate=event.target.value;BB.store.save();}
     if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;BB.store.save();go("parent",{replace:true});}
+    if(event.target.matches("[data-setting-select]")){BB.store.data.settings[event.target.dataset.settingSelect]=event.target.value;BB.store.save();}
   }
 
   document.addEventListener("click",handleClick);
   document.addEventListener("input",handleInput);
   document.addEventListener("change",handleChange);
   document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal();if(event.key==="Enter"&&event.target.matches("[data-pin]"))verifyPin();});
-  window.addEventListener("bb:reward",updateHeader);
+  window.addEventListener("bb:reward",()=>{updateHeader();if(BB.store.data.flowers)BB.memoryJourney?.track("reward","First flower grown",{icon:"🌸",onceKey:"first-flower"});if(BB.store.data.butterflies)BB.memoryJourney?.track("reward","First butterfly earned",{icon:"🦋",onceKey:"first-butterfly"});});
+  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;});
   window.addEventListener("error",event=>{console.error(event.error);toast("Something paused. Please try that touch again.");});
 
   window.BB=window.BB||{};
   BB.navigation={go,back:()=>go(history.pop()||"home",{replace:true}),pageHead,get current(){return route;}};
   BB.app={render:(next,options)=>{route=next;render(options);},pip,modal,closeModal,toast,isParentUnlocked:()=>parentUnlocked};
   BB.accessibility.apply();
-  go("home",{replace:true});
+  setInterval(()=>{if(!document.hidden){BB.store.data.screenSeconds+=60;BB.store.save();}},60000);
+  const guidedRoute=BB.mobileTools.restoreGuided();
+  go(guidedRoute||"home",{replace:true});
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("../service-worker.js").catch(()=>{});
 })();

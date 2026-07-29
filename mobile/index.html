@@ -10,9 +10,10 @@
     <title>BrightBridge Mobile</title>
     <link rel="manifest" href="../manifest.json">
     <link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="mobile.css?v=21">
+    <link rel="apple-touch-icon" href="../assets/icons/icon.svg">
+    <link rel="stylesheet" href="mobile.css?v=22">
   </head>
-  <body>
+  <body class="mobile-app">
     <a class="mobile-skip" href="#view">Skip to activity</a>
     <header class="mobile-header">
       <button class="mobile-brand" type="button" data-route="home" aria-label="BrightBridge home">
@@ -33,6 +34,8 @@
       <p id="pip-bubble">Hi, friend!</p>
     </aside>
 
+    <button id="guided-exit" class="mobile-guided-exit" type="button" data-mt-guided-exit hidden>🔒 Exit guided mode</button>
+
     <nav class="mobile-bottom-nav" aria-label="Main navigation">
       <button type="button" data-route="home"><span>🏠</span><small>Home</small></button>
       <button type="button" data-route="communication"><span>💬</span><small>Talk</small></button>
@@ -44,23 +47,25 @@
     <div id="modal-root"></div>
     <div id="toast-root" class="mobile-toast-root" aria-live="assertive"></div>
 
-    <script src="../js/storage.js?v=21"></script>
-    <script src="../js/voice-library.js?v=21"></script>
-    <script src="../js/speech.js?v=21"></script>
-    <script src="../js/audio.js?v=21"></script>
-    <script src="../js/rewards.js?v=21"></script>
-    <script src="../js/accessibility.js?v=21"></script>
-    <script src="../games/alphabet.js?v=21"></script>
-    <script src="../games/numbers.js?v=21"></script>
-    <script src="../games/colors.js?v=21"></script>
-    <script src="../games/shapes.js?v=21"></script>
-    <script src="../games/matching.js?v=21"></script>
-    <script src="../games/emotions.js?v=21"></script>
-    <script src="../games/music.js?v=21"></script>
-    <script src="../games/nature.js?v=21"></script>
-    <script src="../games/puzzles.js?v=21"></script>
-    <script src="../games/dailylife.js?v=21"></script>
-    <script src="../games/socialskills.js?v=21"></script>
-    <script src="mobile.js?v=21"></script>
+    <script src="../js/storage.js?v=22"></script>
+    <script src="../js/voice-library.js?v=22"></script>
+    <script src="../js/speech.js?v=22"></script>
+    <script src="../js/audio.js?v=22"></script>
+    <script src="../js/rewards.js?v=22"></script>
+    <script src="../js/accessibility.js?v=22"></script>
+    <script src="../games/alphabet.js?v=22"></script>
+    <script src="../games/numbers.js?v=22"></script>
+    <script src="../games/colors.js?v=22"></script>
+    <script src="../games/shapes.js?v=22"></script>
+    <script src="../games/matching.js?v=22"></script>
+    <script src="../games/emotions.js?v=22"></script>
+    <script src="../games/music.js?v=22"></script>
+    <script src="../games/nature.js?v=22"></script>
+    <script src="../games/puzzles.js?v=22"></script>
+    <script src="../games/dailylife.js?v=22"></script>
+    <script src="../games/socialskills.js?v=22"></script>
+    <script src="extra-games.js?v=22"></script>
+    <script src="mobile-tools.js?v=22"></script>
+    <script src="mobile.js?v=22"></script>
   </body>
 </html>
