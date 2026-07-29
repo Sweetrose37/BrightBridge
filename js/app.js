@@ -83,6 +83,7 @@
 
   function render(route, options = {}) {
     if (route !== "parent" && voiceRecorder?.state === "recording") stopVoiceRecording();
+    BB.memoryJourney?.cancelView?.();
     updateHeader();
     const routes = {
       home: renderHome,

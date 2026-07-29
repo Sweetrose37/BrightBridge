@@ -24,6 +24,7 @@
   let slideItems = [];
   let slideIndex = 0;
   let renderToken = 0;
+  let memoryViewActive = false;
 
   function escapeHtml(value = "") {
     return String(value).replace(/[&<>"']/g, character => ({
@@ -151,6 +152,7 @@
       return;
     }
     const token=++renderToken;
+    memoryViewActive=true;
     section = next;
     revokeUrls();
     const view = document.querySelector("#view");
@@ -160,7 +162,7 @@
       letters:renderLetters, celebrate:renderCelebrations, growth:renderGrowthPaths
     };
     const content=await renderers[next]();
-    if(token!==renderToken||BB.navigation.current!=="parent"||!BB.app?.isParentUnlocked?.())return;
+    if(token!==renderToken||!memoryViewActive||BB.navigation.current!=="parent"||!BB.app?.isParentUnlocked?.())return;
     view.innerHTML = content;
     view.focus({preventScroll:true});
     window.scrollTo({top:0,behavior:BB.store.data.settings.reducedMotion?"auto":"smooth"});
@@ -169,6 +171,12 @@
   function revokeUrls() {
     objectUrls.forEach(url => URL.revokeObjectURL(url));
     objectUrls = [];
+  }
+
+  function cancelView() {
+    memoryViewActive=false;
+    renderToken++;
+    revokeUrls();
   }
 
   async function renderHub() {
@@ -875,7 +883,7 @@
   }
 
   document.addEventListener("click",async event=>{
-    if(event.target.closest("[data-route]"))renderToken++;
+    if(event.target.closest("[data-route]"))cancelView();
     const openButton=event.target.closest("[data-memory-open]");if(openButton){await open(openButton.dataset.memoryOpen);return;}
     if(event.target.closest("[data-vj-record]")){startRecording();return;}
     if(event.target.closest("[data-vj-stop]")){stopRecording();return;}
@@ -926,6 +934,6 @@
   window.addEventListener("bb:state",applyGrowthPath);
 
   window.BB=window.BB||{};
-  BB.memoryJourney={open,track,applyGrowthPath,stageVocabulary,homeBanner,encryptedBackup,exportAll,importAll,clear:clearAll};
+  BB.memoryJourney={open,cancelView,track,applyGrowthPath,stageVocabulary,homeBanner,encryptedBackup,exportAll,importAll,clear:clearAll};
   applyGrowthPath();
 })();
