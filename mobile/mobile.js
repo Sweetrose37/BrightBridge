@@ -639,7 +639,7 @@
   }
 
   function showBreathing(){
-    modal(`<div class="mobile-modal-head"><h2>Breathe with Pip</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><div style="text-align:center"><div style="font-size:90px">☁️</div><p>Breathe in slowly while the cloud grows. Breathe out slowly while it gets smaller.</p><button class="mobile-button" type="button" data-action="close-modal">I’m ready</button></div>`,"Breathing");
+    modal(`<div class="mobile-modal-head"><h2>Breathe with Pip</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><div class="pip-breathing"><div class="pip-cloud" role="img" aria-label="A calm breathing cloud"><span class="pip-cloud-eye left"></span><span class="pip-cloud-eye right"></span><span class="pip-cloud-smile"></span></div><h3>Breathe in… breathe out…</h3><p>Breathe in slowly while the cloud grows. Breathe out slowly while it gets smaller.</p><button class="mobile-button" type="button" data-action="close-modal">I’m ready</button></div>`,"Breathing");
     pip("Breathe in slowly. Now breathe out slowly.","😌");
   }
 
