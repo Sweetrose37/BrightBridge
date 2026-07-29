@@ -426,7 +426,7 @@
   function showPinModal() {
     if (parentUnlocked || modalRoot.innerHTML) return;
     modal(`<div class="modal-head"><h2>Grown-up check</h2><button class="close-button" type="button" data-action="close-modal">×</button></div>
-      <p>Type the four-digit parent PIN or tap the number pad.</p>
+      <p><span class="pin-desktop-help">Enter the four-digit parent PIN.</span><span class="pin-mobile-help">Type the four-digit parent PIN or tap the number pad.</span></p>
       <input class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="4" data-pin-input aria-label="Parent PIN">
       <div class="pin-dots" data-pin-dots aria-live="polite">○ ○ ○ ○</div>
       <div class="pin-keypad" aria-label="PIN number pad">
