@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta name="theme-color" content="#7055b8">
+    <meta name="description" content="BrightBridge mobile communication and learning app for children.">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>BrightBridge Mobile</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="css/memory-journey.css?v=15">
+    <link rel="stylesheet" href="css/mobile-app.css?v=15">
+  </head>
+  <body>
+    <a class="mobile-skip" href="#view">Skip to activity</a>
+    <header class="mobile-header">
+      <button class="mobile-brand" type="button" data-route="home" aria-label="BrightBridge home">
+        <span>B</span><strong>BrightBridge</strong>
+      </button>
+      <div class="mobile-header-actions">
+        <button class="mobile-stars" type="button" data-route="rewards" aria-label="Open rewards">⭐ <span id="header-stars">0</span></button>
+        <button class="mobile-parent" type="button" data-route="parent" aria-label="Open Grown-up Area">🔒</button>
+      </div>
+    </header>
+
+    <main id="view" class="mobile-view" tabindex="-1">
+      <section class="mobile-loading"><div>😊</div><h1>BrightBridge</h1><p>Getting your adventures ready…</p></section>
+    </main>
+
+    <aside id="pip" class="mobile-pip" aria-live="polite" aria-atomic="true">
+      <button type="button" data-action="repeat-pip" aria-label="Repeat Pip's message"><span id="pip-expression">😊</span></button>
+      <p id="pip-bubble">Hi, friend!</p>
+    </aside>
+
+    <nav class="mobile-bottom-nav" aria-label="Main navigation">
+      <button type="button" data-route="home"><span>🏠</span><small>Home</small></button>
+      <button type="button" data-route="communication"><span>💬</span><small>Talk</small></button>
+      <button type="button" data-route="learning"><span>📚</span><small>Learn</small></button>
+      <button type="button" data-route="calm"><span>☁️</span><small>Calm</small></button>
+      <button type="button" data-route="more"><span>✨</span><small>More</small></button>
+    </nav>
+
+    <div id="modal-root"></div>
+    <div id="toast-root" class="mobile-toast-root" aria-live="assertive"></div>
+
+    <script src="js/storage.js?v=15"></script>
+    <script src="js/voice-library.js?v=15"></script>
+    <script src="js/speech.js?v=15"></script>
+    <script src="js/audio.js?v=15"></script>
+    <script src="js/rewards.js?v=15"></script>
+    <script src="js/accessibility.js?v=15"></script>
+    <script src="js/settings.js?v=15"></script>
+    <script src="games/alphabet.js?v=15"></script>
+    <script src="games/numbers.js?v=15"></script>
+    <script src="games/colors.js?v=15"></script>
+    <script src="games/shapes.js?v=15"></script>
+    <script src="games/matching.js?v=15"></script>
+    <script src="games/emotions.js?v=15"></script>
+    <script src="games/music.js?v=15"></script>
+    <script src="games/nature.js?v=15"></script>
+    <script src="games/puzzles.js?v=15"></script>
+    <script src="games/dailylife.js?v=15"></script>
+    <script src="games/socialskills.js?v=15"></script>
+    <script src="js/memory-journey.js?v=15"></script>
+    <script src="js/mobile-app.js?v=15"></script>
+  </body>
+</html>
