@@ -1,0 +1,10 @@
+[
+  {"name":"Happy","icon":"😊","support":"Share the happy feeling."},
+  {"name":"Sad","icon":"😢","support":"Ask for comfort or quiet time."},
+  {"name":"Angry","icon":"😠","support":"Pause and breathe slowly."},
+  {"name":"Calm","icon":"😌","support":"Notice how quiet the body feels."},
+  {"name":"Excited","icon":"🤩","support":"Move safely or share the news."},
+  {"name":"Scared","icon":"😨","support":"Find a safe grown-up and ask for help."},
+  {"name":"Frustrated","icon":"😣","support":"Take a break and try again later."},
+  {"name":"Tired","icon":"😴","support":"Rest in a quiet place."}
+]

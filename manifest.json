@@ -1,0 +1,20 @@
+{
+  "name": "BrightBridge — Helping Every Touch Become Communication",
+  "short_name": "BrightBridge",
+  "description": "A calm, accessible, offline learning and communication playground for children.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fffaf3",
+  "theme_color": "#7055b8",
+  "categories": ["education", "kids"],
+  "icons": [
+    {
+      "src": "assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+body.dark{color-scheme:dark;--ink:#f5f3ff;--muted:#c7c1d6;--paper:#171522;--surface:#292638;--line:#4a455d;--shadow:0 8px 0 rgba(0,0,0,.23)}
+body.dark .hero,body.dark .nav-card,body.dark .success-panel,body.dark .garden{color:#26334c}
+body.high-contrast{--ink:#000;--paper:#fff;--surface:#fff;--muted:#222;--line:#000;--purple:#421b9b;--focus:#ff6400}
+body.dark.high-contrast{--ink:#fff;--paper:#000;--surface:#000;--muted:#fff;--line:#fff;--purple:#c9b6ff}
+body.high-contrast button,body.high-contrast .panel,body.high-contrast .hero,body.high-contrast .modal{border-color:currentColor!important}
+body.large-text{--text-scale:1.16}
+body.simple-mode .advanced-only{display:none!important}
+body.color-friendly{--coral:#c85a9e;--mint:#168f87;--sky:#2878b8;--purple:#6646a4}

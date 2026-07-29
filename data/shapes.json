@@ -1,0 +1,7 @@
+[
+  {"name":"Circle","symbol":"●","sides":0},
+  {"name":"Triangle","symbol":"▲","sides":3},
+  {"name":"Square","symbol":"■","sides":4},
+  {"name":"Rectangle","symbol":"▰","sides":4},
+  {"name":"Star","symbol":"★","sides":10}
+]

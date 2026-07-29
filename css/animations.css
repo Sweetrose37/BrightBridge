@@ -1,0 +1,18 @@
+@keyframes enter{from{opacity:0;transform:translateY(9px)}}
+@keyframes float{50%{transform:translateY(-8px) rotate(2deg)}}
+@keyframes pop{0%{opacity:0;transform:scale(.8)}70%{transform:scale(1.04)}}
+@keyframes hint{50%{transform:scale(1.025)}}
+@keyframes breathe{50%{transform:scale(.72)}}
+@keyframes drift{from{transform:translateY(110%) rotate(0)}to{transform:translateY(-140%) rotate(25deg)}}
+@keyframes ripple{from{width:10px;height:10px;opacity:1}to{width:170px;height:170px;opacity:0}}
+@keyframes toast{0%,100%{opacity:0;transform:translateY(8px)}12%,88%{opacity:1;transform:none}}
+.view>section{animation:enter calc(260ms * var(--motion-speed)) ease}
+.hero-mascot,.pip-circle{animation:float calc(4s * var(--motion-speed)) ease-in-out infinite}
+.success-panel{animation:pop calc(550ms * var(--motion-speed)) ease}
+.answer.hint{animation:hint calc(1.2s * var(--motion-speed)) ease-in-out infinite}
+.breathing-orb{animation:breathe calc(8s * var(--motion-speed)) ease-in-out infinite}
+.ripple{animation:ripple calc(1.2s * var(--motion-speed)) ease-out forwards}
+.floating-item{animation:drift calc(var(--drift,8s) * var(--motion-speed)) linear infinite}
+.toast{animation:toast 2.7s both}
+body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}

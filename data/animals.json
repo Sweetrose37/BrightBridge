@@ -1,0 +1,7 @@
+[
+  {"word":"Dog","icon":"🐶","sound":"woof","habitat":"home"},
+  {"word":"Cat","icon":"🐱","sound":"meow","habitat":"home"},
+  {"word":"Bird","icon":"🐦","sound":"tweet","habitat":"nest"},
+  {"word":"Fish","icon":"🐠","sound":"quiet","habitat":"water"},
+  {"word":"Horse","icon":"🐴","sound":"neigh","habitat":"farm"}
+]

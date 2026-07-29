@@ -1,0 +1,8 @@
+[
+  {"name":"Apple","icon":"🍎","group":"fruit"},
+  {"name":"Banana","icon":"🍌","group":"fruit"},
+  {"name":"Carrot","icon":"🥕","group":"vegetable"},
+  {"name":"Sandwich","icon":"🥪","group":"meal"},
+  {"name":"Yogurt","icon":"🥣","group":"snack"},
+  {"name":"Water","icon":"💧","group":"drink"}
+]

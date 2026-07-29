@@ -1,0 +1,8 @@
+[
+  {"name":"Red","value":"#e85b55","example":"apple"},
+  {"name":"Blue","value":"#397fc4","example":"sky"},
+  {"name":"Yellow","value":"#e6ad25","example":"sun"},
+  {"name":"Green","value":"#389778","example":"leaf"},
+  {"name":"Purple","value":"#7657c8","example":"grapes"},
+  {"name":"Orange","value":"#dc7e2c","example":"orange"}
+]

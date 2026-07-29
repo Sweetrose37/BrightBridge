@@ -1,0 +1,8 @@
+[
+  {"id":"alphabet","title":"Alphabet Forest","skills":["uppercase","phonics","vocabulary"]},
+  {"id":"numbers","title":"Counting Cove","skills":["numerals","counting","one-to-one correspondence"]},
+  {"id":"colors","title":"Color Garden","skills":["color recognition","vocabulary"]},
+  {"id":"shapes","title":"Shape Town","skills":["shape recognition","sides","corners"]},
+  {"id":"matching","title":"Matching Meadow","skills":["association","sorting"]},
+  {"id":"puzzles","title":"Pattern Parade","skills":["patterns","prediction","logic"]}
+]
