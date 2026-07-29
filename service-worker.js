@@ -1,4 +1,4 @@
-const CACHE = "brightbridge-v9";
+const CACHE = "brightbridge-v10";
 const CORE = [
   "./",
   "./index.html",
@@ -61,11 +61,26 @@ self.addEventListener("activate", event => {
     caches.keys()
       .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({type:"window"}))
+      .then(clients => Promise.all(clients.map(client => client.navigate ? client.navigate(client.url) : null)))
   );
 });
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+  const updateFirst = event.request.mode === "navigate" || ["script","style"].includes(event.request.destination);
+  if (updateFirst) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      }).catch(() => caches.match(event.request).then(cached => cached || caches.match("./index.html")))
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
       const copy = response.clone();
