@@ -191,7 +191,7 @@
   async function exportBackup() {
     if(!requireParentPin()){BB.app.toast("That PIN did not match.");return;}
     BB.app.toast("Preparing the private backup…");
-    const backup={format:"BrightBridge Complete Backup",version:1,createdAt:new Date().toISOString(),state:BB.store.data,voices:await BB.voiceLibrary.exportAll(),photos:await exportPhotos()};
+    const backup={format:"BrightBridge Complete Backup",version:2,createdAt:new Date().toISOString(),state:BB.store.data,voices:await BB.voiceLibrary.exportAll(),photos:await exportPhotos(),memories:await BB.memoryJourney.exportAll()};
     const blob=new Blob([JSON.stringify(backup)],{type:"application/json"});const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download=`brightbridge-complete-${new Date().toISOString().slice(0,10)}.brightbridge.json`;link.click();URL.revokeObjectURL(link.href);
   }
 
@@ -200,7 +200,7 @@
     try {
       const backup=JSON.parse(await file.text());if(backup.format!=="BrightBridge Complete Backup")throw new Error("Invalid backup");
       BB.store.reset();Object.keys(BB.store.data).forEach(key=>delete BB.store.data[key]);Object.assign(BB.store.data,backup.state);BB.store.save();
-      await BB.voiceLibrary.clear();await BB.voiceLibrary.importAll(backup.voices);await importPhotos(backup.photos);location.reload();
+      await BB.voiceLibrary.clear();await BB.voiceLibrary.importAll(backup.voices);await importPhotos(backup.photos);await BB.memoryJourney.clear();await BB.memoryJourney.importAll(backup.memories);location.reload();
     } catch { BB.app.toast("That backup file could not be restored."); }
   }
 

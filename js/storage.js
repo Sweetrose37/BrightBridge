@@ -14,6 +14,25 @@
     wordUse: {},
     screenSeconds: 0,
     activityVisits: {},
+    memoryJourney: {
+      events: [],
+      birthdaySnapshots: [],
+      growthPath: {
+        stage: "early-explorer",
+        automatic: false,
+        locked: false,
+        matureContent: false,
+        enabledFeatures: {
+          communication: true,
+          learning: true,
+          sensory: true,
+          music: true,
+          nature: true,
+          emotions: true,
+          rewards: true
+        }
+      }
+    },
     profiles: [{ id: "child-1", name: "My Explorer", avatar: "🌟" }],
     activeProfile: "child-1",
     mobileTools: {
@@ -60,7 +79,19 @@
     result.wordUse = saved?.wordUse || {};
     result.mobileTools = { ...base.mobileTools, ...(saved?.mobileTools || {}) };
     result.mobileTools.firstThen = { ...base.mobileTools.firstThen, ...(saved?.mobileTools?.firstThen || {}) };
+    result.memoryJourney = { ...base.memoryJourney, ...(saved?.memoryJourney || {}) };
+    result.memoryJourney.events = saved?.memoryJourney?.events || [];
+    result.memoryJourney.birthdaySnapshots = saved?.memoryJourney?.birthdaySnapshots || [];
+    result.memoryJourney.growthPath = { ...base.memoryJourney.growthPath, ...(saved?.memoryJourney?.growthPath || {}) };
+    result.memoryJourney.growthPath.enabledFeatures = {
+      ...base.memoryJourney.growthPath.enabledFeatures,
+      ...(saved?.memoryJourney?.growthPath?.enabledFeatures || {})
+    };
     result.profiles = saved?.profiles?.length ? saved.profiles : clone(base.profiles);
+    result.profiles = result.profiles.map(profile => ({
+      birthDate: "",
+      ...profile
+    }));
     return result;
   }
 

@@ -25,6 +25,17 @@ external content, or required network services.
 - Stars, flowers, butterflies, stickers, badges, and a growing reward garden.
 - PIN-protected local parent dashboard with progress, screen time, difficulty,
   profile name, JSON export, and reset.
+- PIN-protected **Voice Journey™** with private local audio recording,
+  caregiver-entered titles, dates, ages, notes, tags, favorites, milestones,
+  search, comparison, and audio/PDF/ZIP export.
+- **Look How Far I’ve Come™** timeline, birthday keepsakes, and caregiver-chosen
+  **Journey Through Time** anniversary slideshows.
+- **Letters to My Future Self™** with rich text, photos, linked voice memories,
+  achievements, Reward Garden snapshots, future-reading choices, PDF output,
+  and a printable keepsake book.
+- **BrightBridge Growth Paths™** with four caregiver-controlled stages,
+  optional age progression, stage locking, previews, feature controls,
+  stage-aware AAC vocabulary, and complete history preservation.
 - Dark mode, high contrast, large text, reduced motion, simple mode,
   color-friendly palette, voice controls, and independent audio controls.
 
@@ -75,9 +86,14 @@ Progress, settings, profiles, favorites, AAC history, rewards, and aggregate
 screen time are saved in browser `localStorage`. Family voice recordings are
 stored separately in the browser’s local IndexedDB because audio files are too
 large for settings storage. Personal photo cards use a separate local IndexedDB.
+Voice Journey recordings, private letters, and letter photos use their own local
+IndexedDB. BrightBridge does not translate, decode, interpret, diagnose, or
+infer thoughts or emotions from a child’s vocalizations; all Voice Journey
+organization comes from information entered by a caregiver.
 The mobile complete-backup tool can package settings, progress, recordings, and
-photos into one parent-PIN-protected download workflow. Nothing is sent to a
-server.
+photos into one parent-PIN-protected download workflow. The Grown-up Area also
+offers an AES-GCM encrypted private-memory backup protected by a caregiver
+passphrase. Nothing is sent to a server.
 
 ## Project guide
 

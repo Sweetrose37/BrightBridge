@@ -117,15 +117,17 @@
     return `<section>
       <div class="hero"><div><p class="eyebrow">Helping every touch become communication</p><h1>Hello, ${escapeHtml(name)}!</h1><p class="lead">Choose a gentle adventure. Pip will show, tell, celebrate, and help whenever you need another try.</p></div><div class="hero-mascot" role="img" aria-label="Pip the smiling guide">😊</div></div>
       <div class="section-heading"><h2>Where should we go?</h2><span>No timers • No losing • Always kind</span></div>
+      ${BB.memoryJourney?.homeBanner?.()||""}
       <div class="home-grid">${homeCards.map(([route,icon,title,description,color,tag]) => `<button class="nav-card ${route === "parent" || route === "settings" ? "advanced-only" : ""}" style="--card-color:${color}" type="button" data-route="${route}"><span class="card-tag">${tag}</span><h3>${title}</h3><p>${description}</p><span class="nav-card-icon" aria-hidden="true">${icon}</span></button>`).join("")}</div>
     </section>`;
   }
 
   function renderCommunication() {
-    const categories = [...Object.keys(aac), "Favorites"];
+    const growthWords = BB.memoryJourney?.stageVocabulary?.() || [];
+    const categories = [...Object.keys(aac), "Growth Path", "Favorites"];
     const items = aacCategory === "Favorites"
-      ? Object.values(aac).flat().filter(([word]) => BB.store.data.favorites.includes(word))
-      : aac[aacCategory] || aac.Quick;
+      ? [...Object.values(aac).flat(),...growthWords].filter(([word]) => BB.store.data.favorites.includes(word))
+      : aacCategory === "Growth Path" ? growthWords : aac[aacCategory] || aac.Quick;
     const recent = BB.store.data.recentWords.slice(0, 7);
     return `<section>
       ${BB.navigation.pageHead("My Communication Board", "Touch a card to say it. Put cards together to build a sentence.")}
@@ -202,6 +204,7 @@
     BB.audio.success();
     const reward = BB.rewards.earn(currentGame.title);
     BB.rewards.recordProgress(currentGame.id);
+    BB.memoryJourney?.track("learning","First learning activity completed",{icon:"📚",detail:currentGame.title,onceKey:"first-learning"});
     document.querySelector("#quiz-area").innerHTML = `<div class="success-panel"><div class="success-face">🥳</div><h2>You found it!</h2><p>${round.fact}</p><span class="reward-note">⭐ +1 star ${reward.newSticker ? "• New sticker!" : ""}</span></div><button class="primary-button" type="button" data-action="quiz-next">${gameRound === currentGame.rounds.length - 1 ? "Finish adventure 🏆" : "Next challenge →"}</button>`;
     pip(`Yes! ${round.options[index][1]} is right. ${round.fact}`, "🥳");
     updateHeader();
@@ -374,6 +377,16 @@
     return `<section>
       ${BB.navigation.pageHead("Parent Dashboard", `Local, private progress for ${escapeHtml(activeProfile.name)}.`)}
       <div class="parent-grid"><div class="stat"><strong>${Math.floor(data.screenSeconds/60)}m</strong><span>Screen time</span></div><div class="stat"><strong>${data.stars}</strong><span>Stars earned</span></div><div class="stat"><strong>${Object.keys(data.activityVisits).length}</strong><span>Areas explored</span></div></div>
+      <div class="setting-group" style="margin-top:18px"><h3>✨ Private Memory & Growth</h3>
+        <div class="voice-studio-intro"><span>🌈</span><div><strong>One continuous story—without duplicate tracking</strong><p>Voice Journey, Future Letters, celebrations, and Growth Paths reuse this profile’s existing communication, learning, Reward Garden, and progress history.</p></div></div>
+        <div class="memory-card-grid" style="padding:16px">
+          <button class="memory-feature-card voice" type="button" data-memory-open="voice"><span>🎤</span><div><h2>Voice Journey™</h2><p>Private recordings, caregiver-defined milestones, comparison, search, and export.</p></div></button>
+          <button class="memory-feature-card timeline" type="button" data-memory-open="timeline"><span>🌈</span><div><h2>Look How Far I’ve Come™</h2><p>A personal growth timeline, birthdays, and anniversary replays.</p></div></button>
+          <button class="memory-feature-card letters" type="button" data-memory-open="letters"><span>💌</span><div><h2>Future Letters™</h2><p>Private letters, attachments, reading choices, and keepsake books.</p></div></button>
+          <button class="memory-feature-card growth" type="button" data-memory-open="growth"><span>🌱</span><div><h2>Growth Paths™</h2><p>Caregiver-controlled stages that always preserve history.</p></div></button>
+        </div>
+        <div class="flash-actions"><button class="secondary-button" type="button" data-memory-open="hub">Open Memory Home</button><button class="secondary-button" type="button" data-memory-encrypted-backup>Encrypted memory backup</button><label class="secondary-button">Restore encrypted backup<input class="sr-only" type="file" accept=".bbsecure,application/json" data-memory-encrypted-restore></label></div>
+      </div>
       <div class="setting-group" style="margin-top:18px"><h3>👤 Child profiles</h3><label class="setting-row"><span><strong>Active profile</strong></span><select class="select" data-profile-select>${data.profiles.map(profile => `<option value="${profile.id}" ${profile.id === data.activeProfile ? "selected" : ""}>${profile.avatar} ${escapeHtml(profile.name)}</option>`).join("")}</select></label><label class="setting-row"><span><strong>Display name</strong><small>Shown on the home screen</small></span><input class="select" value="${escapeHtml(activeProfile.name)}" data-profile-name maxlength="30"></label><div class="setting-row"><button class="secondary-button" type="button" data-action="add-profile">Add child profile</button></div><label class="setting-row"><span><strong>Difficulty</strong></span><select class="select" data-setting-select="difficulty"><option value="starter" ${data.settings.difficulty === "starter" ? "selected" : ""}>Starter</option><option value="growing" ${data.settings.difficulty === "growing" ? "selected" : ""}>Growing</option><option value="adventure" ${data.settings.difficulty === "adventure" ? "selected" : ""}>Adventure</option></select></label></div>
       <div class="setting-group voice-studio"><h3>🎙️ Family Voice Library</h3>
         <div class="voice-studio-intro"><span>💜</span><div><strong>Let a familiar voice guide the way</strong><p>Type the exact word or phrase, then upload an audio clip or record it here. BrightBridge will play that family recording whenever the matching words appear.</p></div></div>
@@ -544,7 +557,10 @@
       sentenceText = sentenceText.trim() ? `${sentenceText.trim()} ${word}` : word;
       speakSaved(word);
       BB.store.data.wordUse[word] = (BB.store.data.wordUse[word] || 0) + 1;
-      BB.store.data.recentWords = [word,...BB.store.data.recentWords.filter(item=>item!==word)].slice(0,12); BB.store.save(); view.innerHTML = renderCommunication(); pip(word,"😊",false); return;
+      BB.store.data.recentWords = [word,...BB.store.data.recentWords.filter(item=>item!==word)].slice(0,12);
+      BB.store.save();
+      BB.memoryJourney?.track("communication","First communication card used",{icon:"⭐",detail:word,onceKey:"first-card"});
+      view.innerHTML = renderCommunication(); pip(word,"😊",false); return;
     }
     const favorite = event.target.closest("[data-aac-favorite]");
     if (favorite) {
@@ -572,11 +588,11 @@
     const instrument = event.target.closest("[data-instrument]");
     if (instrument) { musicInstrument = instrument.dataset.instrument; view.innerHTML = renderMusic(); return; }
     const note = event.target.closest("[data-note]");
-    if (note) { const instrumentData = BB.games.music.instruments[musicInstrument]; BB.audio.note(Number(note.dataset.note),instrumentData.type); note.classList.add("playing"); setTimeout(()=>note.classList.remove("playing"),180); return; }
+    if (note) { const instrumentData = BB.games.music.instruments[musicInstrument]; BB.audio.note(Number(note.dataset.note),instrumentData.type); BB.memoryJourney?.track("music","Favorite music discovered",{icon:"🎵",detail:musicInstrument,onceKey:"favorite-music"}); note.classList.add("playing"); setTimeout(()=>note.classList.remove("playing"),180); return; }
     const nature = event.target.closest("[data-nature-scene]");
     if (nature) { currentGame = {sceneId:nature.dataset.natureScene}; view.innerHTML = renderNature(); setupNature(nature.dataset.natureScene); return; }
     const feeling = event.target.closest("[data-feeling]");
-    if (feeling) { const [name,detail] = feeling.dataset.feeling.split("|"); pip(`${name}. ${detail}`,"😊"); return; }
+    if (feeling) { const [name,detail] = feeling.dataset.feeling.split("|"); BB.memoryJourney?.track("emotion","First emotion selected",{icon:"😊",detail:name,onceKey:"first-emotion"}); pip(`${name}. ${detail}`,"😊"); return; }
     const routine = event.target.closest("[data-routine]");
     if (routine) { currentRoutine = routine.dataset.routine; completedRoutineSteps = new Set(); view.innerHTML = renderDaily(); return; }
     const step = event.target.closest("[data-routine-step]");
@@ -604,7 +620,7 @@
     if (!action) return;
     switch (action.dataset.action) {
       case "aac-clear": sentenceText=""; view.innerHTML=renderCommunication(); break;
-      case "aac-speak": {const phrase=(document.querySelector("#aac-sentence")?.value || sentenceText).trim();sentenceText=phrase;if(phrase){speakSaved(phrase);BB.store.data.recentPhrases.unshift(phrase);BB.store.data.recentPhrases=BB.store.data.recentPhrases.slice(0,20);BB.store.save();pip(phrase,"😊",false);}else{pip("Write or choose some words first, then I can say them.","🙂");}} break;
+      case "aac-speak": {const phrase=(document.querySelector("#aac-sentence")?.value || sentenceText).trim();sentenceText=phrase;if(phrase){speakSaved(phrase);BB.store.data.recentPhrases.unshift(phrase);BB.store.data.recentPhrases=BB.store.data.recentPhrases.slice(0,20);BB.store.save();BB.memoryJourney?.track("communication","First sentence created",{icon:"💬",detail:phrase,onceKey:"first-sentence"});pip(phrase,"😊",false);}else{pip("Write or choose some words first, then I can say them.","🙂");}} break;
       case "flash-prev": flashIndex=(flashIndex-1+currentGame.cards.length)%currentGame.cards.length;view.innerHTML=renderFlashcards({keepIndex:true});BB.speech.speak(`${currentGame.cards[flashIndex].word}. ${currentGame.cards[flashIndex].detail}`);break;
       case "flash-next": flashIndex=(flashIndex+1)%currentGame.cards.length;view.innerHTML=renderFlashcards({keepIndex:true});BB.speech.speak(`${currentGame.cards[flashIndex].word}. ${currentGame.cards[flashIndex].detail}`);break;
       case "flash-speak": speakSaved(`${currentGame.cards[flashIndex].word}. ${currentGame.cards[flashIndex].detail}`);break;
@@ -625,7 +641,7 @@
       case "stop-voice-recording": stopVoiceRecording();break;
       case "save-pin": {const pin=document.querySelector("[data-new-pin]").value;if(/^\d{4}$/.test(pin)){BB.store.data.settings.parentPin=pin;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers");}break;
       case "export": downloadExport();break;
-      case "reset": if(confirm("Reset all BrightBridge progress, settings, and family voice clips on this device?")){BB.voiceLibrary.clear().finally(()=>{BB.store.reset();parentUnlocked=false;BB.accessibility.apply();BB.navigation.go("home");});}break;
+      case "reset": if(confirm("Reset all BrightBridge progress, settings, family voice clips, Voice Journey recordings, and private letters on this device?")){Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear()]).finally(()=>{BB.store.reset();parentUnlocked=false;BB.accessibility.apply();BB.navigation.go("home");});}break;
       case "close-modal": closeModal();break;
       case "modal-overlay": if(event.target===action)closeModal();break;
       case "repeat-pip": BB.speech.repeat();break;
@@ -648,10 +664,10 @@
   window.addEventListener("bb:reward",() => updateHeader());
   window.addEventListener("error",event=>{console.error(event.error);toast("Something paused. Please try that touch again.");});
 
-  async function init() {
+  function init() {
     BB.accessibility.apply();
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
-      try { await navigator.serviceWorker.register("./service-worker.js"); } catch (error) { console.warn("Offline mode unavailable",error); }
+      navigator.serviceWorker.register("./service-worker.js").catch(error => console.warn("Offline mode unavailable",error));
     }
     BB.navigation.go("home",{replace:true});
     const guidedRoute = BB.mobileTools.restoreGuided();
@@ -659,6 +675,6 @@
   }
 
   window.BB = window.BB || {};
-  BB.app = { render, pip, modal, closeModal, toast };
+  BB.app = { render, pip, modal, closeModal, toast, isParentUnlocked: () => parentUnlocked };
   init();
 })();

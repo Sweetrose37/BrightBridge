@@ -1,4 +1,4 @@
-const CACHE = "brightbridge-v4";
+const CACHE = "brightbridge-v6";
 const CORE = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const CORE = [
   "./css/themes.css",
   "./css/animations.css",
   "./css/responsive.css",
+  "./css/memory-journey.css",
   "./js/app.js",
   "./js/navigation.js",
   "./js/accessibility.js",
@@ -17,6 +18,7 @@ const CORE = [
   "./js/rewards.js",
   "./js/settings.js",
   "./js/mobile-tools.js",
+  "./js/memory-journey.js",
   "./games/alphabet.js",
   "./games/numbers.js",
   "./games/colors.js",

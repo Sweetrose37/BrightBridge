@@ -19,6 +19,23 @@ Serve the project locally before testing installation or offline behavior.
 10. Unlock the parent dashboard with `2468`, export JSON, and test reset only on
    disposable data.
 
+## Private memory and growth
+
+1. Confirm Voice Journey is separate from the Family Voice Library: the former
+   stores dated memories, while the latter supplies familiar prompt playback.
+2. Add two recordings and test search, sorting, favorites, milestones,
+   comparison, individual audio/PDF export, and a selected-recordings ZIP.
+3. Create a future letter with a photo, voice link, achievement, Reward Garden
+   snapshot, rich formatting, and future-reading choice.
+4. Verify the keepsake print layout and Look How Far I’ve Come timeline merge
+   existing communication, learning, rewards, voice, and letter history.
+5. Set a birthday and check the birthday PDF/image and Journey Through Time
+   slideshow. Only caregiver-selected voice memories should join the replay.
+6. Preview and select every Growth Path. Confirm all history remains intact,
+   mobile visuals change gradually, and stage-aware AAC words appear only once.
+7. Export and restore an encrypted memory backup. Confirm an incorrect
+   passphrase cannot decrypt it.
+
 ## Mobile-only tools
 
 At widths up to 720 pixels:
