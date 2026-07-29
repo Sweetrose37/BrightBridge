@@ -508,6 +508,7 @@
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
+      <div class="mobile-whats-new"><div><span>✨ MOBILE 23</span><h2>New & restored</h2><p>Your tools are ready on this home screen.</p></div><div class="mobile-quick-grid"><button type="button" data-route="tools"><span>🧰</span><strong>My Tools</strong><small>Schedules, choices & photos</small></button><button type="button" data-route="learning"><span>📚</span><strong>26 Learning Activities</strong><small>Phonics through life skills</small></button><button type="button" data-route="calm"><span>🌈</span><strong>10 Sensory Worlds</strong><small>Draw, ripple, float & glow</small></button><button type="button" data-route="parent"><span>🔒</span><strong>Memories & Growth</strong><small>PIN-protected caregiver area</small></button></div></div>
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
