@@ -425,7 +425,34 @@
 
   function showPinModal() {
     if (parentUnlocked || modalRoot.innerHTML) return;
-    modal(`<div class="modal-head"><h2>Grown-up check</h2><button class="close-button" type="button" data-action="close-modal">×</button></div><p>Enter the four-digit parent PIN.</p><input class="select" style="width:100%;font-size:28px;text-align:center" type="password" inputmode="numeric" maxlength="4" data-pin-input aria-label="Parent PIN"><button class="primary-button" type="button" data-action="verify-pin">Continue</button><p class="privacy-note">Starter PIN: 2468</p>`,"Parent PIN");
+    modal(`<div class="modal-head"><h2>Grown-up check</h2><button class="close-button" type="button" data-action="close-modal">×</button></div>
+      <p>Type the four-digit parent PIN or tap the number pad.</p>
+      <input class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="4" data-pin-input aria-label="Parent PIN">
+      <div class="pin-dots" data-pin-dots aria-live="polite">○ ○ ○ ○</div>
+      <div class="pin-keypad" aria-label="PIN number pad">
+        ${["1","2","3","4","5","6","7","8","9","clear","0","back"].map(key=>`<button type="button" data-pin-key="${key}" aria-label="${key==="back"?"Delete last number":key==="clear"?"Clear PIN":`Number ${key}`}">${key==="back"?"⌫":key==="clear"?"Clear":key}</button>`).join("")}
+      </div>
+      <button class="primary-button pin-continue" type="button" data-action="verify-pin">Continue</button>
+      <p class="privacy-note">Starter PIN: 2468</p>`,"Parent PIN");
+    document.querySelector("[data-pin-input]")?.focus();
+  }
+
+  function updatePinDisplay() {
+    const input=document.querySelector("[data-pin-input]");
+    const dots=document.querySelector("[data-pin-dots]");
+    if(!input||!dots)return;
+    input.value=input.value.replace(/\D/g,"").slice(0,4);
+    dots.textContent=[0,1,2,3].map(index=>index<input.value.length?"●":"○").join(" ");
+  }
+
+  function verifyParentPin() {
+    const input=document.querySelector("[data-pin-input]");
+    if(!input)return;
+    if(input.value===BB.store.data.settings.parentPin){
+      parentUnlocked=true;closeModal();BB.navigation.go("parent",{replace:true});toast("Grown-up area unlocked");
+    }else{
+      input.value="";updatePinDisplay();toast("That PIN did not match. Please try again.");input.focus();
+    }
   }
 
   function showQuickFlash(value) {
@@ -616,6 +643,17 @@
       }
       return;
     }
+    const pinKey = event.target.closest("[data-pin-key]");
+    if(pinKey){
+      const input=document.querySelector("[data-pin-input]");if(!input)return;
+      const key=pinKey.dataset.pinKey;
+      if(key==="clear")input.value="";
+      else if(key==="back")input.value=input.value.slice(0,-1);
+      else if(input.value.length<4)input.value+=key;
+      updatePinDisplay();
+      if(input.value.length===4)verifyParentPin();
+      return;
+    }
     const action = event.target.closest("[data-action]");
     if (!action) return;
     switch (action.dataset.action) {
@@ -632,7 +670,7 @@
       case "trace-clear": showTracing();break;
       case "social-next": socialIndex=(socialIndex+1)%BB.games.socialskills.stories.length;view.innerHTML=renderSocial();break;
       case "parent-pin": showPinModal();break;
-      case "verify-pin": if(document.querySelector("[data-pin-input]").value===BB.store.data.settings.parentPin){parentUnlocked=true;closeModal();BB.navigation.go("parent",{replace:true});toast("Grown-up area unlocked");}else{toast("That PIN did not match");}break;
+      case "verify-pin": verifyParentPin();break;
       case "change-pin": modal(`<div class="modal-head"><h2>Change parent PIN</h2><button class="close-button" type="button" data-action="close-modal">×</button></div><input class="select" style="width:100%" type="password" inputmode="numeric" maxlength="4" data-new-pin placeholder="New 4-digit PIN"><button class="primary-button" type="button" data-action="save-pin">Save PIN</button>`,"Change parent PIN");break;
       case "add-profile": modal(`<div class="modal-head"><h2>Add child profile</h2><button class="close-button" type="button" data-action="close-modal">×</button></div><label class="setting-row"><span><strong>Name</strong></span><input class="select" data-new-profile-name maxlength="30" placeholder="Explorer name"></label><label class="setting-row"><span><strong>Avatar</strong></span><select class="select" data-new-profile-avatar><option>🌟</option><option>🦋</option><option>🐳</option><option>🌈</option><option>🚀</option></select></label><button class="primary-button" type="button" data-action="save-profile">Add profile</button>`,"Add child profile");break;
       case "save-profile": {const name=document.querySelector("[data-new-profile-name]").value.trim();if(!name){toast("Please add a name");break;}const id=`child-${Date.now()}`;BB.store.data.profiles.push({id,name,avatar:document.querySelector("[data-new-profile-avatar]").value});BB.store.data.activeProfile=id;BB.store.save();closeModal();BB.navigation.go("parent",{replace:true});toast("Profile added");}break;
@@ -650,6 +688,7 @@
   }
 
   function handleInput(event) {
+    if (event.target.matches("[data-pin-input]")) updatePinDisplay();
     if (event.target.matches("#aac-sentence")) sentenceText = event.target.value;
     if (event.target.matches("[data-setting-range]")) BB.settings.update(event.target.dataset.settingRange,Number(event.target.value));
     if (event.target.matches("[data-setting-select]")) BB.settings.update(event.target.dataset.settingSelect,event.target.value);
@@ -660,6 +699,7 @@
   document.addEventListener("click",handleClick);
   document.addEventListener("input",handleInput);
   document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal();});
+  document.addEventListener("keydown",event=>{if(event.key==="Enter"&&event.target.matches("[data-pin-input]"))verifyParentPin();});
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;document.querySelector('[data-action="install"]').hidden=false;});
   window.addEventListener("bb:reward",() => updateHeader());
   window.addEventListener("bb:voice-sequence",event=>toast(`Playing ${event.detail.count} matching family recordings in order.`));
