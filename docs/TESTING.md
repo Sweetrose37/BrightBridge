@@ -62,6 +62,29 @@ At widths up to 720 pixels:
   and together.
 - Disable speech and effects and confirm all information remains visible.
 
+## Curated mobile videos
+
+1. Confirm **Approved Videos** appears on Home and More without changing the
+   five-item bottom navigation.
+2. Confirm all seven category buttons have large touch targets and that disabled
+   placeholders do not appear in the child library.
+3. Unlock the existing Grown-up Area, open **Manage approved videos**, and add an
+   individual non-live YouTube ID to each category.
+4. Verify a title is required, malformed URLs are rejected, duplicate video IDs
+   are rejected, and a non-live review confirmation is required before saving.
+5. Preview, edit, disable, re-enable, and remove a disposable approved video.
+6. Confirm only enabled videos appear for children and sensory notes are visible
+   before playback.
+7. Confirm playback never starts automatically, YouTube controls and branding
+   remain present, Close Video returns to the curated shelf, and no next video
+   starts automatically.
+8. Test a removed, private, age-restricted, and embedding-disabled ID. Confirm
+   the friendly unavailable message replaces the player.
+9. Confirm there is no search, comments, live chat, channel browser, child link
+   field, YouTube sign-in request, or saved viewing-history record.
+10. Repeat at 320, 360, 390, 430, 600, and 720 CSS pixels with large text, dark
+    mode, high contrast, and reduced motion enabled.
+
 ## Offline and PWA
 
 1. Load once through `localhost` or HTTPS.

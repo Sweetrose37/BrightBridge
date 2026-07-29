@@ -401,6 +401,12 @@
   let sentence="";
   let category="Quick";
   let voiceSetup=false;
+  let videoCategory="all";
+  let editingVideoId="";
+  let approvedVideos=loadApprovedVideos();
+  let youtubeApiPromise=null;
+  let youtubePlayer=null;
+  let youtubeReadyTimer=null;
   let customCards=[];
   let customLoadedProfile="";
   let customPhotoUrls=[];
@@ -435,6 +441,211 @@
   function activeProfile(){
     const data=BB.store.data;
     return data.profiles.find(profile=>profile.id===data.activeProfile)||data.profiles[0];
+  }
+
+  function videoData(){
+    return window.BB_APPROVED_VIDEO_DATA||{categories:[],videos:[]};
+  }
+
+  function normalizeVideo(item={}){
+    return {
+      id:String(item.id||`video-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+      youtubeId:extractYouTubeId(item.youtubeId||""),
+      title:String(item.title||"Approved video").slice(0,100),
+      description:String(item.description||"").slice(0,240),
+      category:String(item.category||videoData().categories[0]?.id||"speech-communication"),
+      thumbnailUrl:String(item.thumbnailUrl||"").slice(0,500),
+      enabled:Boolean(item.enabled),
+      sensoryNotes:String(item.sensoryNotes||"").slice(0,240),
+      recommendedAge:String(item.recommendedAge||"Caregiver choice").slice(0,50),
+      placeholder:Boolean(item.placeholder)
+    };
+  }
+
+  function loadApprovedVideos(){
+    try{
+      const saved=JSON.parse(localStorage.getItem("brightbridge-approved-videos-v1")||"null");
+      if(Array.isArray(saved))return saved.map(normalizeVideo);
+    }catch{}
+    return (videoData().videos||[]).map(normalizeVideo);
+  }
+
+  function saveApprovedVideos(){
+    localStorage.setItem("brightbridge-approved-videos-v1",JSON.stringify(approvedVideos));
+  }
+
+  function clearApprovedVideos(){
+    localStorage.removeItem("brightbridge-approved-videos-v1");
+    approvedVideos=(videoData().videos||[]).map(normalizeVideo);
+    editingVideoId="";videoCategory="all";
+  }
+
+  function extractYouTubeId(value=""){
+    const input=String(value).trim();
+    if(/^[A-Za-z0-9_-]{11}$/.test(input))return input;
+    try{
+      const url=new URL(input);
+      const host=url.hostname.replace(/^www\./,"").toLowerCase();
+      let candidate="";
+      if(host==="youtu.be")candidate=url.pathname.split("/").filter(Boolean)[0]||"";
+      else if(["youtube.com","m.youtube.com","music.youtube.com","youtube-nocookie.com"].includes(host)){
+        candidate=url.searchParams.get("v")||"";
+        if(!candidate){const parts=url.pathname.split("/").filter(Boolean);if(["embed","shorts"].includes(parts[0]))candidate=parts[1]||"";}
+      }
+      return /^[A-Za-z0-9_-]{11}$/.test(candidate)?candidate:"";
+    }catch{return "";}
+  }
+
+  function videoThumbnail(video){
+    if(video.thumbnailUrl&&/^https:\/\/i\.ytimg\.com\//i.test(video.thumbnailUrl))return video.thumbnailUrl;
+    return video.youtubeId?`https://i.ytimg.com/vi/${video.youtubeId}/hqdefault.jpg`:"";
+  }
+
+  function enabledVideos(){
+    return approvedVideos.filter(video=>video.enabled&&video.youtubeId&&!video.placeholder);
+  }
+
+  function youtubeEmbedUrl(videoId){
+    const origin=location.origin&&location.origin!=="null"?`&origin=${encodeURIComponent(location.origin)}`:"";
+    return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&autoplay=0&controls=1&playsinline=1&rel=0&loop=0${origin}`;
+  }
+
+  function ensureYouTubeApi(){
+    if(window.YT?.Player)return Promise.resolve(window.YT);
+    if(youtubeApiPromise)return youtubeApiPromise;
+    youtubeApiPromise=new Promise((resolve,reject)=>{
+      const prior=window.onYouTubeIframeAPIReady;
+      const timeout=setTimeout(()=>reject(new Error("YouTube player timed out.")),12000);
+      window.onYouTubeIframeAPIReady=()=>{clearTimeout(timeout);try{prior?.();}catch{}resolve(window.YT);};
+      const existing=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      if(!existing){
+        const script=document.createElement("script");
+        script.src="https://www.youtube.com/iframe_api";script.async=true;
+        script.onerror=()=>{clearTimeout(timeout);youtubeApiPromise=null;reject(new Error("YouTube player could not load."));};
+        document.head.appendChild(script);
+      }
+    }).catch(error=>{youtubeApiPromise=null;throw error;});
+    return youtubeApiPromise;
+  }
+
+  function destroyVideoPlayer(){
+    clearTimeout(youtubeReadyTimer);youtubeReadyTimer=null;
+    try{youtubePlayer?.stopVideo?.();youtubePlayer?.destroy?.();}catch{}
+    youtubePlayer=null;
+  }
+
+  function showVideoUnavailable(){
+    destroyVideoPlayer();
+    const target=document.querySelector("[data-video-player-wrap]");
+    if(target)target.innerHTML='<div class="mobile-video-error" role="alert"><span>📺</span><h3>This video is not available right now.</h3><p>Please choose another video.</p></div>';
+  }
+
+  function openVideoPlayer(video){
+    if(!video?.youtubeId)return;
+    destroyVideoPlayer();
+    modal(`<div class="mobile-modal-head"><h2>${esc(video.title)}</h2><button class="mobile-close" type="button" data-action="close-video" aria-label="Close video">×</button></div>
+      ${video.sensoryNotes?`<div class="mobile-sensory-warning" role="note"><strong>⚠️ Sensory note</strong><span>${esc(video.sensoryNotes)}</span></div>`:""}
+      <div class="mobile-video-player" data-video-player-wrap>
+        <p class="mobile-video-loading" aria-live="polite">Getting the approved video ready…</p>
+        <iframe id="brightbridge-youtube-player" title="${esc(video.title)} — approved YouTube video" src="${youtubeEmbedUrl(video.youtubeId)}" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </div>
+      <p class="mobile-video-privacy">YouTube privacy-enhanced player · Nothing plays until you tap the YouTube play control.</p>
+      <button class="mobile-button mobile-wide-button" type="button" data-action="close-video">Close Video</button>`,"Approved video");
+    youtubeReadyTimer=setTimeout(showVideoUnavailable,15000);
+    ensureYouTubeApi().then(YT=>{
+      const frame=document.querySelector("#brightbridge-youtube-player");if(!frame)return;
+      youtubePlayer=new YT.Player(frame,{events:{
+        onReady:()=>{clearTimeout(youtubeReadyTimer);youtubeReadyTimer=null;document.querySelector(".mobile-video-loading")?.remove();},
+        onError:showVideoUnavailable
+      }});
+    }).catch(showVideoUnavailable);
+  }
+
+  function renderVideoCard(video,manage=false){
+    const thumbnail=videoThumbnail(video);
+    return `<article class="mobile-video-card ${video.enabled?"":"is-disabled"}">
+      <div class="mobile-video-thumb">${thumbnail?`<img src="${thumbnail}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'<span aria-hidden="true">📺</span>'}<div class="mobile-approved-badge">${manage&&!video.enabled?"Not enabled":"✓ Parent approved"}</div></div>
+      <div class="mobile-video-copy"><h3>${esc(video.title)}</h3>${video.description?`<p>${esc(video.description)}</p>`:""}<div class="mobile-video-meta"><span>👧 ${esc(video.recommendedAge||"Caregiver choice")}</span>${video.sensoryNotes?'<span class="has-warning">⚠️ Sensory note</span>':""}</div>${video.sensoryNotes?`<div class="mobile-sensory-warning"><strong>⚠️ Sensory note</strong><span>${esc(video.sensoryNotes)}</span></div>`:""}</div>
+      ${manage?`<div class="mobile-video-manage-actions"><button type="button" data-video-preview="${esc(video.id)}" ${video.youtubeId?"":"disabled"}>▶ Preview</button><button type="button" data-video-edit="${esc(video.id)}">✏️ Edit</button><button type="button" data-video-toggle="${esc(video.id)}">${video.enabled?"Disable":"Enable"}</button><button class="danger" type="button" data-video-remove="${esc(video.id)}">Remove</button></div>`:`<button class="mobile-video-play" type="button" data-video-play="${esc(video.id)}" aria-label="Play ${esc(video.title)}">▶ Play</button>`}
+    </article>`;
+  }
+
+  function renderVideos(){
+    const categories=videoData().categories||[],videos=enabledVideos().filter(video=>videoCategory==="all"||video.category===videoCategory);
+    return `<section>${pageHead("Approved Videos","Only videos chosen by a grown-up appear here.","more")}
+      <div class="mobile-video-notice"><span>🛡️</span><div><strong>Safe video shelf</strong><small>No search, comments, live chat, or autoplay.</small></div></div>
+      <div class="mobile-video-categories"><button class="${videoCategory==="all"?"active":""}" type="button" data-video-category="all"><span>✨</span><strong>All Videos</strong></button>${categories.map(item=>`<button class="${videoCategory===item.id?"active":""}" style="--video-category:${item.color}" type="button" data-video-category="${esc(item.id)}"><span>${item.icon}</span><strong>${esc(item.label)}</strong></button>`).join("")}</div>
+      <div class="mobile-section-title"><h2>${videoCategory==="all"?"Approved for you":esc(categories.find(item=>item.id===videoCategory)?.label||"Approved videos")}</h2><small>${videos.length} ${videos.length===1?"video":"videos"}</small></div>
+      <div class="mobile-video-grid">${videos.map(video=>renderVideoCard(video)).join("")||'<div class="mobile-video-empty"><span>🌟</span><h2>No videos here yet</h2><p>A grown-up can add carefully chosen videos in the Grown-up Area.</p></div>'}</div>
+    </section>`;
+  }
+
+  function renderVideoManager(){
+    if(!parentUnlocked){
+      setTimeout(()=>showPin(()=>go("videoManager",{replace:true})),0);
+      return `<section>${pageHead("Video Library Controls","A parent PIN protects approved videos.","parent")}<div class="mobile-panel"><h2>Grown-up check needed</h2></div></section>`;
+    }
+    const categories=videoData().categories||[],editing=approvedVideos.find(video=>video.id===editingVideoId);
+    return `<section>${pageHead("Video Library Controls","Only enabled, parent-approved videos appear for children.","parent")}
+      <div class="mobile-panel mobile-video-manager-form">
+        <h2>${editing?"Edit approved video":"Add approved video"}</h2>
+        <p>Paste one individual YouTube video ID or URL. Preview every video before enabling it.</p>
+        <label><span>YouTube video ID or URL</span><input data-video-field="youtubeId" value="${esc(editing?.youtubeId||"")}" autocomplete="off" placeholder="Example: M7lc1UVf-VE"></label>
+        <label><span>Category</span><select data-video-field="category">${categories.map(item=>`<option value="${esc(item.id)}" ${item.id===(editing?.category||categories[0]?.id)?"selected":""}>${item.icon} ${esc(item.label)}</option>`).join("")}</select></label>
+        <label><span>Title</span><input data-video-field="title" value="${esc(editing?.title||"")}" maxlength="100" placeholder="Child-friendly title"></label>
+        <label><span>Short description</span><textarea data-video-field="description" maxlength="240" placeholder="What will the child see or learn?">${esc(editing?.description||"")}</textarea></label>
+        <label><span>Recommended age range</span><input data-video-field="recommendedAge" value="${esc(editing?.recommendedAge||"Caregiver choice")}" maxlength="50" placeholder="Example: Ages 4–8"></label>
+        <label><span>Possible sensory concerns</span><textarea data-video-field="sensoryNotes" maxlength="240" placeholder="Example: Upbeat music and quick movement">${esc(editing?.sensoryNotes||"")}</textarea></label>
+        <label class="mobile-video-check"><input type="checkbox" data-video-nonlive><span>I checked that this is an individual, non-live video suitable for this child.</span></label>
+        <label class="mobile-video-check"><input type="checkbox" data-video-field="enabled" ${editing?.enabled?"checked":""}><span>Show this video in the child library</span></label>
+        <div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-action="video-form-preview">Preview</button><button class="mobile-button" type="button" data-action="video-save">${editing?"Save changes":"Add approved video"}</button></div>
+        ${editing?'<button class="mobile-button secondary mobile-wide-button" type="button" data-action="video-cancel-edit">Cancel editing</button>':""}
+      </div>
+      <div class="mobile-video-manager-note"><strong>Important</strong><p>BrightBridge cannot automatically judge a video's content or detect every live, age, regional, or embedding restriction. The approving adult must review the complete video.</p></div>
+      <div class="mobile-section-title"><h2>Saved approved list</h2><small>${approvedVideos.length} entries</small></div>
+      <div class="mobile-video-grid">${approvedVideos.map(video=>renderVideoCard(video,true)).join("")||'<div class="mobile-video-empty"><p>No saved videos.</p></div>'}</div>
+    </section>`;
+  }
+
+  function videoFormDraft(){
+    const value=name=>document.querySelector(`[data-video-field="${name}"]`)?.value?.trim()||"";
+    const youtubeId=extractYouTubeId(value("youtubeId"));
+    return {
+      youtubeId,
+      title:value("title"),
+      description:value("description"),
+      category:value("category"),
+      thumbnailUrl:youtubeId?`https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`:"",
+      enabled:Boolean(document.querySelector('[data-video-field="enabled"]')?.checked),
+      sensoryNotes:value("sensoryNotes"),
+      recommendedAge:value("recommendedAge")||"Caregiver choice",
+      placeholder:false
+    };
+  }
+
+  function saveVideoFromForm(){
+    if(!parentUnlocked)return;
+    const draft=videoFormDraft();
+    if(!draft.youtubeId){toast("Enter a valid individual YouTube video ID or URL.");return;}
+    if(!draft.title){toast("Add a child-friendly video title.");return;}
+    if(!document.querySelector("[data-video-nonlive]")?.checked){toast("Confirm that you reviewed this individual, non-live video.");return;}
+    if(approvedVideos.some(video=>video.youtubeId===draft.youtubeId&&video.id!==editingVideoId)){toast("That YouTube video is already in the approved list.");return;}
+    if(!videoData().categories.some(item=>item.id===draft.category))draft.category=videoData().categories[0]?.id||"speech-communication";
+    const current=approvedVideos.find(video=>video.id===editingVideoId);
+    const id=current?.id||(crypto.randomUUID?.()||`video-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    const saved=normalizeVideo({...current,...draft,id});
+    const index=approvedVideos.findIndex(video=>video.id===id);
+    if(index>=0)approvedVideos.splice(index,1,saved);else approvedVideos.push(saved);
+    saveApprovedVideos();editingVideoId="";
+    view.innerHTML=renderVideoManager();resetPageScroll();
+    toast(saved.enabled?"Video saved and visible in the child library.":"Video saved but kept hidden from children.");
+  }
+
+  function previewVideoForm(){
+    if(!parentUnlocked)return;
+    const draft=videoFormDraft();
+    if(!draft.youtubeId){toast("Enter a valid YouTube video ID or URL to preview.");return;}
+    openVideoPlayer({...draft,title:draft.title||"Video preview"});
   }
 
   function customDatabase(){
@@ -568,6 +779,7 @@
   }
 
   function closeModal(){
+    destroyVideoPlayer();
     modalRoot.innerHTML="";
     pinSuccess=null;
     BB.speech.stop();
@@ -593,7 +805,7 @@
     render(options);
     document.querySelectorAll(".mobile-bottom-nav [data-route]").forEach(button=>{
       const navRoute=button.dataset.route;
-      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","tools","parent","settings"].includes(route)));
+      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","tools","videos","videoManager","parent","settings"].includes(route)));
     });
     view.focus({preventScroll:true});
     resetPageScroll();
@@ -606,12 +818,15 @@
       flashcards:()=>renderFlashcards(options),quiz:()=>renderQuiz(options),
       calm:renderCalm,music:renderMusic,nature:renderNature,daily:renderDaily,
       social:renderSocial,rewards:renderRewards,progress:renderProgress,
-      more:renderMore,tools:()=>BB.mobileTools.render(),parent:renderParent,settings:renderSettings,
+      more:renderMore,videos:renderVideos,videoManager:renderVideoManager,
+      tools:()=>BB.mobileTools.render(),parent:renderParent,settings:renderSettings,
       memory:()=>`${pageHead("Private Memory Studio","Opening the selected caregiver feature…","parent")}<div class="mobile-panel">💜 Gathering private memories…</div>`
     };
     view.innerHTML=(screens[route]||renderHome)();
-    BB.store.data.activityVisits[route]=(BB.store.data.activityVisits[route]||0)+1;
-    BB.store.save();
+    if(!["videos","videoManager"].includes(route)){
+      BB.store.data.activityVisits[route]=(BB.store.data.activityVisits[route]||0)+1;
+      BB.store.save();
+    }
     if(route==="communication"){
       if(voiceSetup)setTimeout(refreshVoiceList,0);
       if(customLoadedProfile!==activeProfile().id)setTimeout(()=>loadCustomCards(),0);
@@ -630,12 +845,13 @@
       ["calm","☁️","Feelings & Calm","Breathe, name feelings, and sensory play","#dff4ff"],
       ["daily","🚪","Daily Living","Practice familiar routines","#e5f2ff"],
       ["music","🎹","Music","Play notes and discover sounds","#fff0c9"],
-      ["nature","🦋","Nature","Explore animals, gardens, oceans, and space","#ddf5ed"]
+      ["nature","🦋","Nature","Explore animals, gardens, oceans, and space","#ddf5ed"],
+      ["videos","📺","Approved Videos","Only videos chosen by a grown-up","#fce2f0"]
     ];
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
-      <div class="mobile-whats-new"><div><span>✨ MOBILE 25</span><h2>More ways to communicate</h2><p>Quick Talk, expanded conversation packs, and private custom cards are ready.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Quick Talk & Card Packs</strong><small>Safety, sensory, school & more</small></button><button type="button" data-route="tools"><span>🧰</span><strong>My Tools</strong><small>Schedules, choices & photos</small></button><button type="button" data-route="calm"><span>🌈</span><strong>10 Sensory Worlds</strong><small>Draw, ripple, float & glow</small></button><button type="button" data-route="parent"><span>🔒</span><strong>Memories & Growth</strong><small>PIN-protected caregiver area</small></button></div></div>
+      <div class="mobile-whats-new"><div><span>✨ MOBILE 26</span><h2>Safe approved videos</h2><p>Children see only the individual videos a grown-up chooses.</p></div><div class="mobile-quick-grid"><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>No search, comments, or autoplay</small></button><button type="button" data-route="communication"><span>💬</span><strong>Quick Talk & Card Packs</strong><small>Safety, sensory, school & more</small></button><button type="button" data-route="tools"><span>🧰</span><strong>My Tools</strong><small>Schedules, choices & photos</small></button><button type="button" data-route="parent"><span>🔒</span><strong>Grown-up Controls</strong><small>Manage the approved video shelf</small></button></div></div>
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
@@ -791,6 +1007,7 @@
       ["social","🤝","Social Stories","Kind and safe choices","#eee6ff"],
       ["music","🎹","Music","Free musical play","#fff0c9"],
       ["nature","🦋","Nature","Oceans, gardens, and space","#ddf5ed"],
+      ["videos","📺","Approved Videos","A safe, grown-up-curated video shelf","#fce2f0"],
       ["rewards","🌻","Reward Garden","Celebrate effort","#fff0bd"],
       ["progress","📈","My Progress","Personal growth only","#ddf5ed"],
       ["tools","🧰","My Tools","Schedules, choices, photos, and guided mode","#e5f2ff"],
@@ -826,7 +1043,7 @@
         </details>
       </div>
       <div class="mobile-profile-actions"><button class="mobile-button secondary" type="button" data-action="add-profile"><span>➕</span><strong>Add another profile</strong><small>Create a separate private journey</small></button><button class="mobile-button secondary" type="button" data-route="communication"><span>🎙️</span><strong>Family Voice Cards</strong><small>Record beside exact communication cards</small></button></div>
-      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button><button class="mobile-button secondary" type="button" data-action="export">⬇ Export progress</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
+      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button><button class="mobile-button secondary" type="button" data-action="export">⬇ Export progress</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
     </section>`;
   }
 
@@ -985,6 +1202,18 @@
   function handleClick(event){
     const routeButton=event.target.closest("[data-route]");
     if(routeButton){go(routeButton.dataset.route);return;}
+    const videoCategoryButton=event.target.closest("[data-video-category]");
+    if(videoCategoryButton){videoCategory=videoCategoryButton.dataset.videoCategory;view.innerHTML=renderVideos();resetPageScroll();return;}
+    const videoPlay=event.target.closest("[data-video-play]");
+    if(videoPlay){const video=enabledVideos().find(item=>item.id===videoPlay.dataset.videoPlay);if(video)openVideoPlayer(video);return;}
+    const videoPreview=event.target.closest("[data-video-preview]");
+    if(videoPreview&&parentUnlocked){const video=approvedVideos.find(item=>item.id===videoPreview.dataset.videoPreview);if(video?.youtubeId)openVideoPlayer(video);return;}
+    const videoEdit=event.target.closest("[data-video-edit]");
+    if(videoEdit&&parentUnlocked){editingVideoId=videoEdit.dataset.videoEdit;view.innerHTML=renderVideoManager();resetPageScroll();return;}
+    const videoToggle=event.target.closest("[data-video-toggle]");
+    if(videoToggle&&parentUnlocked){const video=approvedVideos.find(item=>item.id===videoToggle.dataset.videoToggle);if(video){if(!video.youtubeId){toast("Add and review a YouTube video before enabling this entry.");return;}video.enabled=!video.enabled;video.placeholder=false;saveApprovedVideos();view.innerHTML=renderVideoManager();toast(video.enabled?"Video enabled":"Video hidden from children");}return;}
+    const videoRemove=event.target.closest("[data-video-remove]");
+    if(videoRemove&&parentUnlocked){const video=approvedVideos.find(item=>item.id===videoRemove.dataset.videoRemove);if(video&&confirm(`Remove “${video.title}” from the approved list?`)){approvedVideos=approvedVideos.filter(item=>item.id!==video.id);saveApprovedVideos();if(editingVideoId===video.id)editingVideoId="";view.innerHTML=renderVideoManager();toast("Video removed");}return;}
     const pinKey=event.target.closest("[data-pin-key]");
     if(pinKey){const input=document.querySelector("[data-pin]");if(!input)return;const key=pinKey.dataset.pinKey;if(key==="clear")input.value="";else if(key==="back")input.value=input.value.slice(0,-1);else if(input.value.length<4)input.value+=key;updatePin();if(input.value.length===4)verifyPin();return;}
     const categoryButton=event.target.closest("[data-category]");
@@ -1019,6 +1248,10 @@
       case "repeat-pip":BB.speech.repeat();break;
       case "voice-setup":toggleVoiceSetup();break;
       case "custom-add":addCustomCard();break;
+      case "video-form-preview":previewVideoForm();break;
+      case "video-save":saveVideoFromForm();break;
+      case "video-cancel-edit":editingVideoId="";view.innerHTML=renderVideoManager();resetPageScroll();break;
+      case "close-video":closeModal();if(route==="videos"){view.innerHTML=renderVideos();view.focus({preventScroll:true});}break;
       case "record-stop":stopRecording();break;
       case "sentence-clear":sentence="";refreshCommunication();break;
       case "sentence-speak":{const value=(document.querySelector("[data-sentence]")?.value||sentence).trim();sentence=value;if(value){speakExact(value);BB.store.data.recentPhrases.unshift(value);BB.store.data.recentPhrases=BB.store.data.recentPhrases.slice(0,20);BB.store.save();BB.memoryJourney?.track("communication","First sentence created",{icon:"💬",detail:value,onceKey:"first-sentence"});pip(value,"😊");}else toast("Add words to the sentence first.");break;}
@@ -1040,7 +1273,7 @@
       case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();go("parent",{replace:true});break;}
       case "delete-profile":{if(BB.store.data.profiles.length<2)break;if(confirm(`Delete ${activeProfile().name}'s profile? Private recordings must be deleted separately.`)){BB.store.data.profiles=BB.store.data.profiles.filter(item=>item.id!==BB.store.data.activeProfile);BB.store.data.activeProfile=BB.store.data.profiles[0].id;BB.store.save();go("parent",{replace:true});}break;}
       case "export":exportProgress();break;
-      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear(),clearCustomCards()]).finally(()=>{BB.store.reset();parentUnlocked=false;go("home");});break;
+      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear(),clearCustomCards()]).finally(()=>{clearApprovedVideos();BB.store.reset();parentUnlocked=false;go("home");});break;
       case "close-modal":closeModal();break;
       case "modal-overlay":if(event.target===action)closeModal();break;
     }
