@@ -47,6 +47,12 @@
   function database() {
     databasePromise ||= new Promise((resolve, reject) => {
       const request = indexedDB.open(databaseName, 2);
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error("Private voice storage is taking too long. Close other BrightBridge tabs, reopen the app, and try again."));
+      }, 7000);
       request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains(legacyStoreName)) {
@@ -56,8 +62,24 @@
           db.createObjectStore(storeName, { keyPath: "recordingId" });
         }
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        if (settled) { request.result.close(); return; }
+        settled = true;clearTimeout(timer);
+        request.result.onversionchange = () => request.result.close();
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        if (settled) return;
+        settled = true;clearTimeout(timer);reject(request.error);
+      };
+      request.onblocked = () => {
+        if (settled) return;
+        settled = true;clearTimeout(timer);
+        reject(new Error("Close other BrightBridge tabs, reopen the app, and try saving the voice again."));
+      };
+    }).catch(error => {
+      databasePromise = null;
+      throw error;
     });
     return databasePromise;
   }

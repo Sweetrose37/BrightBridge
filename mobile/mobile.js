@@ -436,6 +436,7 @@
   let editingParentVoiceCategory="";
   let editingParentVoiceCardId="";
   let editingParentVoiceRecordingId="";
+  let editingParentVoiceRecord=null;
   let stagedParentVoice=null;
   let stagedParentVoiceDuration=0;
   let stagedParentVoiceSource="";
@@ -1175,7 +1176,7 @@
   function closeModal(){
     destroyVideoPlayer();
     stopParentVoiceRecording(true);
-    stagedParentVoice=null;stagedParentVoiceDuration=0;stagedParentVoiceSource="";editingParentVoicePhrase="";editingParentVoiceCategory="";editingParentVoiceCardId="";editingParentVoiceRecordingId="";
+    stagedParentVoice=null;stagedParentVoiceDuration=0;stagedParentVoiceSource="";editingParentVoicePhrase="";editingParentVoiceCategory="";editingParentVoiceCardId="";editingParentVoiceRecordingId="";editingParentVoiceRecord=null;
     modalRoot.innerHTML="";
     pinSuccess=null;
     BB.speech.stop();
@@ -1253,7 +1254,7 @@
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
-      <div class="mobile-whats-new"><div><span>✨ MOBILE 29</span><h2>Familiar Voices for More Cards</h2><p>The protected Parent Voice recorder now supports Quick Talk, Feelings, and Calm & Sensory with separate voices for each child.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Expanded Communication</strong><small>Needs, feelings, sensory, safety & more</small></button><button type="button" data-route="parent"><span>🎙️</span><strong>Parent Card Voices</strong><small>Record or upload behind the Parent PIN</small></button><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>Only assigned, active approvals</small></button><button type="button" data-route="caregiverVideos"><span>📨</span><strong>Request a Video</strong><small>Separate caregiver request access</small></button></div></div>
+      <div class="mobile-whats-new"><div><span>✨ MOBILE 30</span><h2>Reliable Parent Voice Saving</h2><p>The Feelings and Calm & Sensory recorder now re-enables immediately after recording or upload, with safer private-storage recovery.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Expanded Communication</strong><small>Needs, feelings, sensory, safety & more</small></button><button type="button" data-route="parent"><span>🎙️</span><strong>Parent Card Voices</strong><small>Record or upload behind the Parent PIN</small></button><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>Only assigned, active approvals</small></button><button type="button" data-route="caregiverVideos"><span>📨</span><strong>Request a Video</strong><small>Separate caregiver request access</small></button></div></div>
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
@@ -1393,7 +1394,12 @@
     if(!BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory)){toast("Parent Voice is not enabled for this card.");return;}
     stopParentVoiceRecording(true);
     editingParentVoicePhrase=phrase;editingParentVoiceCategory=cardCategory;editingParentVoiceRecordingId=recordingId;editingParentVoiceCardId=cardId||BB_COMMUNICATION_CARDS.cardId(cardCategory,phrase);
-    const record=recordingId?await BB.parentVoices.getForParent(parentVoiceActor,{recordingId}):null;
+    let record=null;
+    if(recordingId){
+      try{record=await BB.parentVoices.getForParent(parentVoiceActor,{recordingId});}
+      catch(error){toast(error.message||"The saved voice could not be opened. You can still record a replacement.");}
+    }
+    editingParentVoiceRecord=record;
     stagedParentVoice=record?.blob||null;
     stagedParentVoiceDuration=record?.duration||0;
     stagedParentVoiceSource=record?.audioSource||"recording";
@@ -1422,9 +1428,9 @@
         const duration=Math.min(15,(Date.now()-parentVoiceStartedAt)/1000);
         const blob=new Blob(parentVoiceChunks,{type:parentVoiceRecorder.mimeType||"audio/webm"});
         parentVoiceStream?.getTracks().forEach(track=>track.stop());parentVoiceStream=null;
-        if(!blob.size){toast("The recording was empty. Please try again.");return;}
+        if(!blob.size){toast("The recording was empty. Please try again.");modal(voiceEditorContent(editingParentVoicePhrase,editingParentVoiceRecord),`Parent voice for ${editingParentVoicePhrase}`);return;}
         stagedParentVoice=blob;stagedParentVoiceDuration=duration;stagedParentVoiceSource="recording";
-        BB.parentVoices.getForParent(parentVoiceActor,{recordingId:editingParentVoiceRecordingId}).then(record=>modal(voiceEditorContent(editingParentVoicePhrase,record),`Parent voice for ${editingParentVoicePhrase}`));
+        modal(voiceEditorContent(editingParentVoicePhrase,editingParentVoiceRecord),`Parent voice for ${editingParentVoicePhrase}`);
       },{once:true});
       parentVoiceRecorder.start();
       updateParentRecordStatus("Recording… 0 seconds");
@@ -1439,8 +1445,7 @@
     }catch(error){
       parentVoiceStream?.getTracks().forEach(track=>track.stop());parentVoiceStream=null;
       toast(error?.name==="NotAllowedError"?"Microphone access is needed only to record a voice for this communication card. You can still upload an audio file or use the default voice.":"The microphone could not start. You can still upload an audio file or use the default voice.");
-      const record=await BB.parentVoices.getForParent(parentVoiceActor,{recordingId:editingParentVoiceRecordingId});
-      modal(voiceEditorContent(editingParentVoicePhrase,record),`Parent voice for ${editingParentVoicePhrase}`);
+      modal(voiceEditorContent(editingParentVoicePhrase,editingParentVoiceRecord),`Parent voice for ${editingParentVoicePhrase}`);
     }
   }
 
@@ -1473,14 +1478,15 @@
       const duration=await audioDuration(file);
       if(duration>15.05){toast("Choose an audio clip that is 15 seconds or shorter.");input.value="";return;}
       stagedParentVoice=file;stagedParentVoiceDuration=duration;stagedParentVoiceSource="upload";
-      const record=await BB.parentVoices.getForParent(parentVoiceActor,{recordingId:editingParentVoiceRecordingId});
-      modal(voiceEditorContent(editingParentVoicePhrase,record),`Parent voice for ${editingParentVoicePhrase}`);
+      modal(voiceEditorContent(editingParentVoicePhrase,editingParentVoiceRecord),`Parent voice for ${editingParentVoicePhrase}`);
       toast("Audio is ready to preview. Tap Save Voice when it sounds right.");
     }catch(error){toast(error.message||"That audio file could not be read.");input.value="";}
   }
 
   async function saveStagedParentVoice(){
     if(!parentVoiceActor||!stagedParentVoice)return;
+    const saveButton=document.querySelector('[data-action="parent-voice-save"]');
+    if(saveButton){saveButton.disabled=true;saveButton.textContent="Saving privately…";}
     const all=document.querySelector("[data-parent-voice-all]")?.checked;
     const profileIds=[...document.querySelectorAll("[data-parent-voice-profile]:checked")].map(input=>input.dataset.parentVoiceProfile);
     try{
@@ -1488,11 +1494,11 @@
       await BB.parentVoices.save(parentVoiceActor,{recordingId:editingParentVoiceRecordingId,cardId:editingParentVoiceCardId,categoryId:editingParentVoiceCategory,phrase:editingParentVoicePhrase,blob:stagedParentVoice,source:stagedParentVoiceSource,duration:stagedParentVoiceDuration,allProfiles:all,profileIds});
       await loadParentVoices();
       closeParentVoiceEditor();view.innerHTML=route==="parentVoiceLibrary"?renderParentVoiceLibrary():renderQuickTalkVoices();toast(`Parent voice saved for “${savedPhrase}”`);
-    }catch(error){toast(error.message||"That parent voice could not be saved.");}
+    }catch(error){toast(error.message||"That parent voice could not be saved.");if(saveButton){saveButton.disabled=false;saveButton.textContent="Save Voice";}}
   }
 
   function closeParentVoiceEditor(){
-    stopParentVoiceRecording(true);stagedParentVoice=null;stagedParentVoiceDuration=0;stagedParentVoiceSource="";editingParentVoicePhrase="";editingParentVoiceCategory="";editingParentVoiceCardId="";editingParentVoiceRecordingId="";modalRoot.innerHTML="";
+    stopParentVoiceRecording(true);stagedParentVoice=null;stagedParentVoiceDuration=0;stagedParentVoiceSource="";editingParentVoicePhrase="";editingParentVoiceCategory="";editingParentVoiceCardId="";editingParentVoiceRecordingId="";editingParentVoiceRecord=null;modalRoot.innerHTML="";
   }
 
   function renderLearning(){
