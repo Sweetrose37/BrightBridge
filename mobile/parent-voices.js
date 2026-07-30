@@ -8,6 +8,8 @@
   let migrationPromise;
   let activeAudio = null;
   let activeUrl = "";
+  let playbackCache = [];
+  let cacheReady = false;
 
   function normalize(value) {
     return window.BB_COMMUNICATION_CARDS?.equivalentKey(value) ||
@@ -190,6 +192,8 @@
       enabled: true
     };
     await withStore(storeName, "readwrite", store => store.put(record));
+    playbackCache = await withStore(storeName, "readonly", store => store.getAll());
+    cacheReady = true;
     return publicRecord(record);
   }
 
@@ -229,6 +233,8 @@
     for (const record of matches) {
       await withStore(storeName, "readwrite", store => store.delete(record.recordingId));
     }
+    playbackCache = playbackCache.filter(item => !matches.some(match => match.recordingId === item.recordingId));
+    cacheReady = true;
     return matches.length;
   }
 
@@ -239,21 +245,48 @@
     if ((await database()).objectStoreNames.contains(legacyStoreName)) {
       await withStore(legacyStoreName, "readwrite", store => store.clear());
     }
+    playbackCache = [];
+    cacheReady = true;
+  }
+
+  function selectForChild(records, details, profileId) {
+    const query = typeof details === "string" ? { phrase: details, categoryId: "Quick" } : (details || {});
+    const id = cardIdentity(query);
+    const eligible = records.filter(item => item.enabled !== false);
+    let matches = eligible.filter(item => item.cardId === id);
+    if (!matches.length && query.categoryId && query.phrase) {
+      matches = eligible.filter(item =>
+        item.categoryId === query.categoryId &&
+        item.normalizedPhrase === normalize(query.phrase)
+      );
+    }
+    return matches
+        .filter(item => item.childProfileIds?.includes(String(profileId)))
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ||
+        matches.filter(item => item.childProfileIds?.includes("*"))
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ||
+        null;
+  }
+
+  async function warm() {
+    try {
+      playbackCache = await allRecords();
+      cacheReady = true;
+      return playbackCache.length;
+    } catch {
+      cacheReady = false;
+      return 0;
+    }
+  }
+
+  function getCachedForChild(details, profileId) {
+    return cacheReady ? selectForChild(playbackCache, details, profileId) : null;
   }
 
   async function getForChild(details, profileId) {
     try {
-      const query = typeof details === "string" ? { phrase: details, categoryId: "Quick" } : (details || {});
-      const id = cardIdentity(query);
-      const records = (await allRecords()).filter(item =>
-        item.enabled !== false && item.cardId === id
-      );
-      return records
-        .filter(item => item.childProfileIds?.includes(String(profileId)))
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ||
-        records.filter(item => item.childProfileIds?.includes("*"))
-          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ||
-        null;
+      if (!cacheReady) await warm();
+      return selectForChild(playbackCache, details, profileId);
     } catch {
       return null;
     }
@@ -314,6 +347,6 @@
   BB.parentVoices = {
     authorize, close, save, list, getForParent, remove, clear,
     getForChild, playForChild, playForParent, playBlob, stop, pause, resume,
-    cardIdentity
+    cardIdentity, warm, getCachedForChild
   };
 })();

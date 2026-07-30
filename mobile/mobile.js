@@ -1254,7 +1254,7 @@
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
-      <div class="mobile-whats-new"><div><span>✨ MOBILE 30</span><h2>Reliable Parent Voice Saving</h2><p>The Feelings and Calm & Sensory recorder now re-enables immediately after recording or upload, with safer private-storage recovery.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Expanded Communication</strong><small>Needs, feelings, sensory, safety & more</small></button><button type="button" data-route="parent"><span>🎙️</span><strong>Parent Card Voices</strong><small>Record or upload behind the Parent PIN</small></button><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>Only assigned, active approvals</small></button><button type="button" data-route="caregiverVideos"><span>📨</span><strong>Request a Video</strong><small>Separate caregiver request access</small></button></div></div>
+      <div class="mobile-whats-new"><div><span>✨ MOBILE 31</span><h2>Parent Voices Play on the First Tap</h2><p>Private assigned voices are prepared from offline storage before card taps, preventing mobile browsers from silencing delayed playback.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Expanded Communication</strong><small>Needs, feelings, sensory, safety & more</small></button><button type="button" data-route="parent"><span>🎙️</span><strong>Parent Card Voices</strong><small>Record or upload behind the Parent PIN</small></button><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>Only assigned, active approvals</small></button><button type="button" data-route="caregiverVideos"><span>📨</span><strong>Request a Video</strong><small>Separate caregiver request access</small></button></div></div>
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
@@ -1744,9 +1744,16 @@
     const generation=++speechGeneration;
     BB.speech.stop();BB.parentVoices.stop();window.speechSynthesis?.cancel();
     const eligible=BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory);
-    const parentRecord=eligible?await BB.parentVoices.getForChild({phrase:text,categoryId:cardCategory,cardId},activeProfile().id):null;
-    if(generation!==speechGeneration)return;
-    const customPlayed=parentRecord?await BB.parentVoices.playBlob(parentRecord.blob,BB.store.data.settings.speechVolume):false;
+    const voiceDetails={phrase:text,categoryId:cardCategory,cardId};
+    const cachedRecord=eligible?BB.parentVoices.getCachedForChild(voiceDetails,activeProfile().id):null;
+    let parentRecord=cachedRecord,customPlayed=false;
+    if(cachedRecord){
+      customPlayed=await BB.parentVoices.playBlob(cachedRecord.blob,BB.store.data.settings.speechVolume);
+    }else if(eligible){
+      parentRecord=await BB.parentVoices.getForChild(voiceDetails,activeProfile().id);
+      if(generation!==speechGeneration)return;
+      customPlayed=parentRecord?await BB.parentVoices.playBlob(parentRecord.blob,BB.store.data.settings.speechVolume):false;
+    }
     if(generation!==speechGeneration)return;
     if(customPlayed)return;
     const played=await BB.speech.speak(text);
@@ -1974,6 +1981,7 @@
   BB.app={render:(next,options)=>{route=next;render(options);},pip,modal,closeModal,toast,isParentUnlocked:()=>parentUnlocked};
   BB.communicationCatalog={cards:communicationCardModel,duplicateReport:catalogUpgrade.report,findDuplicate:(phrase,cardCategory)=>BB_COMMUNICATION_CARDS.findDuplicate(phrase,cardCategory,aac,customCards)};
   BB.accessibility.apply();
+  BB.parentVoices.warm();
   setInterval(()=>{if(!document.hidden){BB.store.data.screenSeconds+=60;BB.store.save();}},60000);
   const guidedRoute=BB.mobileTools.restoreGuided();
   go(guidedRoute||"home",{replace:true});
