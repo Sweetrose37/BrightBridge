@@ -253,19 +253,31 @@
     const query = typeof details === "string" ? { phrase: details, categoryId: "Quick" } : (details || {});
     const id = cardIdentity(query);
     const eligible = records.filter(item => item.enabled !== false);
-    let matches = eligible.filter(item => item.cardId === id);
-    if (!matches.length && query.categoryId && query.phrase) {
-      matches = eligible.filter(item =>
-        item.categoryId === query.categoryId &&
-        item.normalizedPhrase === normalize(query.phrase)
-      );
+    const phraseKey = normalize(query.phrase);
+    const feelingKey = value => normalize(value).replace(/^(i am|i feel|im)\s+/i, "");
+    const newest = items => [...items].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0] || null;
+    const assigned = matches =>
+      newest(matches.filter(item => item.childProfileIds?.includes(String(profileId)))) ||
+      newest(matches.filter(item => item.childProfileIds?.includes("*"))) ||
+      ((BB.store?.data?.profiles || []).length === 1
+        ? newest(matches.filter(item => !item.childProfileIds?.length))
+        : null);
+    const candidateGroups = [
+      eligible.filter(item => item.cardId === id),
+      eligible.filter(item => item.categoryId === query.categoryId && item.normalizedPhrase === phraseKey),
+      eligible.filter(item => item.normalizedPhrase === phraseKey)
+    ];
+    if (query.categoryId === "Feelings" && phraseKey) {
+      candidateGroups.push(eligible.filter(item =>
+        ["Feelings", "Quick"].includes(item.categoryId) &&
+        feelingKey(item.phrase || item.normalizedPhrase) === feelingKey(query.phrase)
+      ));
     }
-    return matches
-        .filter(item => item.childProfileIds?.includes(String(profileId)))
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ||
-        matches.filter(item => item.childProfileIds?.includes("*"))
-          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ||
-        null;
+    for (const matches of candidateGroups) {
+      const record = assigned(matches);
+      if (record) return record;
+    }
+    return null;
   }
 
   async function warm() {

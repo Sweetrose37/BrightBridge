@@ -1823,7 +1823,7 @@
     catch{toast("That audio file could not be saved.");}
   }
 
-  async function speakExact(text,cardCategory="",cardId="",dailyEventId=""){
+  async function speakExact(text,cardCategory="",cardId="",dailyEventId="",legacyAliases=[]){
     const generation=++speechGeneration;
     BB.speech.stop();BB.parentVoices.stop();window.speechSynthesis?.cancel();
     const eligible=BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory);
@@ -1842,6 +1842,11 @@
     const played=await BB.speech.speak(text);
     if(generation!==speechGeneration){BB.speech.stop();return;}
     if(played){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"default");return;}
+    for(const alias of legacyAliases){
+      const legacyPlayed=await BB.voiceLibrary.play(alias,BB.store.data.settings.speechVolume);
+      if(generation!==speechGeneration){BB.voiceLibrary.stop();return;}
+      if(legacyPlayed){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"parent");return;}
+    }
     if(BB.store.data.settings.speech&&"speechSynthesis" in window&&"SpeechSynthesisUtterance" in window){
       const utterance=new SpeechSynthesisUtterance(text);
       utterance.lang=BB.store.data.settings.language||"en-US";
@@ -2051,7 +2056,7 @@
     const cards=event.target.closest("[data-cards]");if(cards){currentGame=BB.games[cards.dataset.cards];cardIndex=0;go("flashcards",{game:currentGame.id});return;}
     const play=event.target.closest("[data-play]");if(play){currentGame=BB.games[play.dataset.play];roundIndex=0;quizLocked=false;quizAttempts=0;go("quiz",{game:currentGame.id});return;}
     const answer=event.target.closest("[data-answer]");if(answer){answerQuiz(Number(answer.dataset.answer));return;}
-    const feeling=event.target.closest("[data-feeling]");if(feeling){const [name,detail]=feeling.dataset.feeling.split("|"),voicePhrase=feeling.dataset.feelingVoice||`I am ${name.toLocaleLowerCase()}`,voiceCardId=feeling.dataset.feelingCardId||BB_COMMUNICATION_CARDS.cardId("Feelings",voicePhrase);const dailyEventId=BB.dailyReports.recordCard(activeProfile().id,{phrase:voicePhrase,category:"Feelings",cardId:voiceCardId});speakExact(voicePhrase,"Feelings",voiceCardId,dailyEventId);BB.memoryJourney?.track("emotion","First emotion selected",{icon:"😊",detail:name,onceKey:"first-emotion"});pip(`${name}. ${detail}`,"😊");return;}
+    const feeling=event.target.closest("[data-feeling]");if(feeling){const [name,detail]=feeling.dataset.feeling.split("|"),voicePhrase=feeling.dataset.feelingVoice||`I am ${name.toLocaleLowerCase()}`,voiceCardId=feeling.dataset.feelingCardId||BB_COMMUNICATION_CARDS.cardId("Feelings",voicePhrase);const dailyEventId=BB.dailyReports.recordCard(activeProfile().id,{phrase:voicePhrase,category:"Feelings",cardId:voiceCardId});speakExact(voicePhrase,"Feelings",voiceCardId,dailyEventId,[name]);BB.memoryJourney?.track("emotion","First emotion selected",{icon:"😊",detail:name,onceKey:"first-emotion"});pip(`${name}. ${detail}`,"😊");return;}
     const sensory=event.target.closest("[data-sensory-mode]");if(sensory){sensoryMode=sensory.dataset.sensoryMode;BB.dailyReports.recordCalm(activeProfile().id,sensoryExperiences[sensoryMode]?.[1]||"Sensory activity");view.innerHTML=renderCalm();setupSensory();return;}
     const instrumentButton=event.target.closest("[data-instrument]");if(instrumentButton){instrument=instrumentButton.dataset.instrument;view.innerHTML=renderMusic();BB.memoryJourney?.track("music","Favorite music discovered",{icon:"🎵",detail:BB.games.music.instruments[instrument].label,onceKey:`music-${instrument}`});return;}
     const note=event.target.closest("[data-note]");if(note){BB.audio.note(Number(note.dataset.note),BB.games.music.instruments[instrument].type);BB.memoryJourney?.track("music","First musical note played",{icon:"🎵",detail:BB.games.music.instruments[instrument].label,onceKey:"first-music"});return;}
