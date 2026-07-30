@@ -18,8 +18,8 @@
     <main>
       <div class="mark">B</div>
       <h1>Refreshing BrightBridge</h1>
-      <p id="status">Getting the newest mobile version…</p>
-      <a id="continue" href="./mobile/?fresh=27" hidden>Open BrightBridge Mobile</a>
+      <p id="status">Refreshing BrightBridge…</p>
+      <a id="continue" href="./mobile/?fresh=32" hidden>Open BrightBridge Mobile</a>
     </main>
     <script>
       (async function () {
@@ -33,9 +33,9 @@
             await Promise.all(names.filter(name => name.startsWith("brightbridge-")).map(name => caches.delete(name)));
           }
         } finally {
-          document.querySelector("#status").textContent = "The newest version is ready. Your saved progress was kept.";
+          document.querySelector("#status").textContent = "BrightBridge is ready. Your saved progress was kept.";
           document.querySelector("#continue").hidden = false;
-          setTimeout(() => location.replace("./mobile/?fresh=27"), 900);
+          setTimeout(() => location.replace("./mobile/?fresh=32"), 900);
         }
       })();
     </script>

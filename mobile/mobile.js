@@ -418,6 +418,7 @@
   let currentVideoRecord=null;
   let currentVideoPreview=false;
   let videoUsageTimer=null;
+  let currentVideoDailyStarted=false;
   let customCards=[];
   let customLoadedProfile="";
   let customPhotoUrls=[];
@@ -448,6 +449,12 @@
   let cancelParentVoiceCapture=false;
   let editingCustomId="";
   let speechGeneration=0;
+  let reportProfile="";
+  let reportStartDate="";
+  let reportEndDate="";
+  let reportSearch="";
+  let reportView="history";
+  let reportSearchTimer=0;
   let currentGame=null;
   let cardIndex=0;
   let roundIndex=0;
@@ -578,12 +585,20 @@
     clearInterval(videoUsageTimer);videoUsageTimer=null;
   }
   function startVideoUsage(){
-    if(videoUsageTimer||currentVideoPreview||!currentVideoRecord?.viewingLimitMinutes)return;
+    if(videoUsageTimer||currentVideoPreview||!currentVideoRecord)return;
+    if(!currentVideoDailyStarted){
+      const categoryLabel=videoData().categories.find(item=>item.id===currentVideoRecord.category)?.label||currentVideoRecord.category;
+      BB.dailyReports.recordVideo(activeProfile().id,{title:currentVideoRecord.title,category:categoryLabel});
+      currentVideoDailyStarted=true;
+    }
     videoUsageTimer=setInterval(()=>{
-      const usage=videoUsageState(),key=videoUsageKey(currentVideoRecord);
-      usage.seconds[key]=(usage.seconds[key]||0)+1;
-      try{localStorage.setItem("brightbridge-video-daily-allowance-v1",JSON.stringify(usage));}catch{}
-      if(videoLimitReached(currentVideoRecord)){
+      BB.dailyReports.addVideoSeconds(activeProfile().id,1);
+      if(currentVideoRecord.viewingLimitMinutes){
+        const usage=videoUsageState(),key=videoUsageKey(currentVideoRecord);
+        usage.seconds[key]=(usage.seconds[key]||0)+1;
+        try{localStorage.setItem("brightbridge-video-daily-allowance-v1",JSON.stringify(usage));}catch{}
+      }
+      if(currentVideoRecord.viewingLimitMinutes&&videoLimitReached(currentVideoRecord)){
         stopVideoUsage();
         try{youtubePlayer?.stopVideo?.();}catch{}
         const target=document.querySelector("[data-video-player-wrap]");
@@ -630,7 +645,7 @@
       return;
     }
     destroyVideoPlayer();
-    currentVideoRecord=video;currentVideoPreview=preview;
+    currentVideoRecord=video;currentVideoPreview=preview;currentVideoDailyStarted=false;
     modal(`<div class="mobile-modal-head"><h2>${esc(video.title)}</h2><button class="mobile-close" type="button" data-action="close-video" aria-label="Close video">×</button></div>
       ${video.sensoryNotes?`<div class="mobile-sensory-warning" role="note"><strong>⚠️ Sensory note</strong><span>${esc(video.sensoryNotes)}</span></div>`:""}
       <div class="mobile-video-player" data-video-player-wrap>
@@ -1205,7 +1220,7 @@
     render(options);
     document.querySelectorAll(".mobile-bottom-nav [data-route]").forEach(button=>{
       const navRoute=button.dataset.route;
-      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","tools","videos","videoManager","caregiverVideos","videoApprovals","parent","quickTalkVoices","parentVoiceLibrary","settings"].includes(route)));
+      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","dailyReports","tools","videos","videoManager","caregiverVideos","videoApprovals","parent","quickTalkVoices","parentVoiceLibrary","settings"].includes(route)));
     });
     view.focus({preventScroll:true});
     resetPageScroll();
@@ -1217,7 +1232,7 @@
       home:renderHome,communication:renderCommunication,learning:renderLearning,
       flashcards:()=>renderFlashcards(options),quiz:()=>renderQuiz(options),
       calm:renderCalm,music:renderMusic,nature:renderNature,daily:renderDaily,
-      social:renderSocial,rewards:renderRewards,progress:renderProgress,
+      social:renderSocial,rewards:renderRewards,progress:renderProgress,dailyReports:renderDailyReports,
       more:renderMore,videos:renderVideos,videoManager:renderVideoManager,
       caregiverVideos:renderCaregiverVideoRequests,videoApprovals:renderParentVideoApprovals,
       tools:()=>BB.mobileTools.render(),parent:renderParent,quickTalkVoices:renderQuickTalkVoices,parentVoiceLibrary:renderParentVoiceLibrary,settings:renderSettings,
@@ -1254,7 +1269,6 @@
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
-      <div class="mobile-whats-new"><div><span>✨ MOBILE 31</span><h2>Parent Voices Play on the First Tap</h2><p>Private assigned voices are prepared from offline storage before card taps, preventing mobile browsers from silencing delayed playback.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Expanded Communication</strong><small>Needs, feelings, sensory, safety & more</small></button><button type="button" data-route="parent"><span>🎙️</span><strong>Parent Card Voices</strong><small>Record or upload behind the Parent PIN</small></button><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>Only assigned, active approvals</small></button><button type="button" data-route="caregiverVideos"><span>📨</span><strong>Request a Video</strong><small>Separate caregiver request access</small></button></div></div>
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
@@ -1589,6 +1603,72 @@
     </section>`;
   }
 
+  function reportDateLabel(date){
+    const today=BB.dailyReports.localDate(),yesterdayDate=new Date();yesterdayDate.setDate(yesterdayDate.getDate()-1);
+    const formatted=new Date(`${date}T12:00:00`).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+    if(date===today)return `Today — ${formatted.replace(/^[^,]+, /,"")}`;
+    if(date===BB.dailyReports.localDate(yesterdayDate))return `Yesterday — ${formatted.replace(/^[^,]+, /,"")}`;
+    return formatted;
+  }
+
+  function reportList(){
+    const profileId=reportProfile||activeProfile().id;
+    const reports=BB.dailyReports.records({profileId,startDate:reportStartDate,endDate:reportEndDate});
+    const query=reportSearch.trim().toLocaleLowerCase();
+    return query?reports.filter(report=>{
+      const searchable=[report.reportDate,BB.dailyReports.profileName(report.childProfileId),...Object.keys(report.phraseCounts||{}),...Object.keys(report.feelingsSelected||{}),...(report.parentNotes||[]).map(note=>note.text)].join(" ").toLocaleLowerCase();
+      return searchable.includes(query);
+    }):reports;
+  }
+
+  function renderReportMap(map,empty="None recorded"){
+    const entries=BB.dailyReports.topEntries(map||{},[],8);
+    return entries.length?`<ul>${entries.map(([label,count])=>`<li><strong>${esc(label)}</strong> — ${count} ${count===1?"time":"times"}</li>`).join("")}</ul>`:`<p class="muted">${empty}</p>`;
+  }
+
+  function renderDailyReportCard(report){
+    const topPhrases=BB.dailyReports.topEntries(report.phraseCounts||{},report.excludedPhraseKeys||[],8);
+    const topCategory=BB.dailyReports.topEntries(report.communicationCategoryCounts||{},[],1)[0]?.[0]||"No activity recorded";
+    const videoCount=Object.values(report.videosViewed||{}).reduce((sum,count)=>sum+count,0);
+    const notes=[...(report.caregiverNotes||[]),...(report.parentNotes||[])];
+    const empty=!report.totalCardTaps&&!report.totalSessionSeconds&&!videoCount;
+    return `<article class="mobile-daily-report ${report.reviewed?"is-reviewed":""}" data-report-card="${esc(report.reportDate)}">
+      <div class="mobile-report-heading"><div><small>${esc(BB.dailyReports.profileName(report.childProfileId))}</small><h2>${esc(reportDateLabel(report.reportDate))}</h2></div><span>${report.finalizedAt?"Archived":"Live today"}</span></div>
+      ${empty?'<div class="mobile-report-empty">No app activity was recorded for this day.</div>':`
+      <div class="mobile-report-summary">${esc(BB.dailyReports.plainSummary(report))}</div>
+      <div class="mobile-report-totals"><div><strong>${report.totalAppSessions||0}</strong><span>Sessions</span></div><div><strong>${Math.round((report.totalSessionSeconds||0)/60)}m</strong><span>App time</span></div><div><strong>${report.totalCardTaps||0}</strong><span>Card selections</span></div><div><strong>${(report.uniqueCardKeys||[]).length}</strong><span>Different cards</span></div></div>
+      <details><summary>Communication details</summary><h3>Most active category</h3><p>${esc(topCategory)}</p><h3>Most used communications</h3>${topPhrases.length?`<ol>${topPhrases.map(([phrase,count])=>`<li><span>“${esc(phrase)}” — ${count} ${count===1?"time":"times"}</span><button type="button" data-report-exclude="${esc(phrase)}" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Exclude accidental tap</button></li>`).join("")}</ol>`:'<p class="muted">No activity recorded</p>'}<h3>Feelings communicated</h3>${renderReportMap(report.feelingsSelected)}<h3>Needs communicated</h3>${renderReportMap(report.needsCommunicated)}<h3>Calm and sensory support</h3>${renderReportMap(report.calmStrategiesUsed)}</details>
+      <details><summary>Voice, videos, and learning</summary><div class="mobile-report-readable-list"><p><strong>Parent-recorded voice cards:</strong> ${report.parentVoiceUsageCount||0}</p><p><strong>Default voice cards:</strong> ${report.defaultVoiceUsageCount||0}</p><p><strong>Text-to-speech fallback:</strong> ${report.textToSpeechUsageCount||0}</p><p><strong>Videos watched:</strong> ${videoCount}</p><p><strong>Video time:</strong> ${Math.round((report.videoSeconds||0)/60)} minutes</p><p><strong>Goals completed:</strong> ${Object.values(report.goalsCompleted||{}).reduce((sum,count)=>sum+count,0)}</p></div></details>`}
+      ${report.safetyEvents?.length?`<div class="mobile-report-safety"><h3>Safety information</h3>${report.safetyEvents.map(item=>`<p>“${esc(item.phrase)}” — ${new Date(item.timestamp).toLocaleString()}</p>`).join("")}</div>`:""}
+      <details open><summary>Parent notes</summary><div class="mobile-report-notes">${(report.caregiverNotes||[]).map(note=>`<p>${esc(note.text)}<small>${esc(note.role||"Caregiver")} · ${new Date(note.timestamp).toLocaleString()}</small></p>`).join("")}${(report.parentNotes||[]).map((note,index)=>`<p>${esc(note.text)}<small>${esc(note.role||"Parent or guardian")} · ${new Date(note.timestamp).toLocaleString()}${note.editedAt?" · corrected":""}</small><button type="button" data-report-note-edit="${index}" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Correct note</button></p>`).join("")||(!notes.length?'<p class="muted">No notes added</p>':"")}</div><label class="mobile-tool-label"><span>Add a private parent note</span><textarea data-report-note="${esc(report.reportDate)}" data-report-note-profile="${esc(report.childProfileId)}" maxlength="1000" placeholder="Add a factual note for this day"></textarea></label><button class="mobile-button secondary" type="button" data-report-note-save="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Save note</button></details>
+      <div class="mobile-report-actions"><button class="mobile-button secondary" type="button" data-report-reviewed="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">${report.reviewed?"✓ Reviewed":"Mark reviewed"}</button><button class="mobile-button" type="button" data-report-export="print" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Print / Save PDF</button><button class="mobile-button secondary" type="button" data-report-export="text" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Plain text</button></div>
+    </article>`;
+  }
+
+  function renderDailyReports(){
+    if(!parentUnlocked)return renderParent();
+    reportProfile||=activeProfile().id;
+    const reports=reportList();
+    const now=new Date(),weekStart=new Date(now);weekStart.setDate(now.getDate()-6);
+    const monthStart=`${BB.dailyReports.localDate(now).slice(0,7)}-01`;
+    const summaryStart=reportView==="week"?BB.dailyReports.localDate(weekStart):reportView==="month"?monthStart:"";
+    const summaryReports=summaryStart?BB.dailyReports.records({profileId:reportProfile,startDate:summaryStart,endDate:BB.dailyReports.localDate()}):[];
+    const summary=summaryReports.length?BB.dailyReports.aggregate(summaryReports):null;
+    return `<section>${pageHead("Daily Reports","Private, parent-friendly communication and activity history.","parent")}
+      <div class="mobile-report-toolbar">
+        <label><span>Child profile</span><select data-report-filter="profile">${BB.store.data.profiles.map(profile=>`<option value="${esc(profile.id)}" ${reportProfile===profile.id?"selected":""}>${profile.avatar||"🌟"} ${esc(profile.name)}</option>`).join("")}</select></label>
+        <label><span>From date</span><input type="date" data-report-filter="start" value="${esc(reportStartDate)}"></label>
+        <label><span>To date</span><input type="date" data-report-filter="end" value="${esc(reportEndDate)}"></label>
+        <label><span>Search reports</span><input type="search" data-report-search value="${esc(reportSearch)}" placeholder="Phrase, feeling, note, or date"></label>
+      </div>
+      <div class="mobile-category-row"><button class="mobile-chip ${reportView==="history"?"active":""}" type="button" data-report-view="history">Daily history</button><button class="mobile-chip ${reportView==="week"?"active":""}" type="button" data-report-view="week">Weekly summary</button><button class="mobile-chip ${reportView==="month"?"active":""}" type="button" data-report-view="month">Monthly summary</button></div>
+      <div class="mobile-report-export-bar"><button class="mobile-button" type="button" data-report-export="print" data-report-scope="range">Print / Save PDF</button><button class="mobile-button secondary" type="button" data-report-export="csv" data-report-scope="range">Readable CSV</button><button class="mobile-button secondary" type="button" data-report-export="text" data-report-scope="range">Plain text</button><button class="mobile-button secondary" type="button" data-report-export="print" data-report-scope="all">All history PDF</button></div>
+      ${summary?`<div class="mobile-panel"><h2>${reportView==="week"?"Last 7 days":"This month"}</h2><div class="mobile-report-totals"><div><strong>${summaryReports.length}</strong><span>Days</span></div><div><strong>${summary.totalCardTaps}</strong><span>Card selections</span></div><div><strong>${Math.round(summary.totalSessionSeconds/60)}m</strong><span>App time</span></div><div><strong>${summary.parentVoiceUsageCount}</strong><span>Parent voices</span></div></div><p>${esc(BB.dailyReports.plainSummary(summary))}</p></div>`:""}
+      <div class="mobile-report-history">${reports.map(renderDailyReportCard).join("")||'<div class="mobile-panel"><h2>No reports match</h2><p>No activity was recorded for the selected child and date range.</p></div>'}</div>
+      <details class="mobile-panel"><summary>Advanced technical support</summary><p>This backup contains technical app data and is not the normal parent report.</p><button class="mobile-button secondary" type="button" data-action="export-raw">Export Raw Data for Technical Support</button></details>
+    </section>`;
+  }
+
   function renderMore(){
     const cards=[
       ["daily","🚪","Daily Living","Step-by-step routines","#e6f1ff"],
@@ -1614,9 +1694,9 @@
       setTimeout(()=>showPin(),0);
       return `<section>${pageHead("Grown-up Area","A parent PIN protects these private controls.","more")}<div class="mobile-panel" style="text-align:center"><div style="font-size:65px">🔒</div><h2>Grown-up check needed</h2><button class="mobile-button" type="button" data-action="open-pin">Enter PIN</button>${BB.store.data.settings.parentPin==="2468"?'<p class="muted">Starter PIN: 2468</p>':""}</div></section>`;
     }
-    const data=BB.store.data,profile=activeProfile();
+    const data=BB.store.data,profile=activeProfile(),todayReport=BB.dailyReports.ensureDay(profile.id);
     return `<section>${pageHead("Parent Dashboard",`Private controls for ${profile.name}.`,"more")}
-      <div class="mobile-stats"><div class="mobile-stat"><strong>${Math.floor(data.screenSeconds/60)}m</strong><span>App time</span></div><div class="mobile-stat"><strong>${data.stars}</strong><span>Stars</span></div></div>
+      <div class="mobile-stats"><div class="mobile-stat"><strong>${Math.round((todayReport.totalSessionSeconds||0)/60)}m</strong><span>Today’s app time</span></div><div class="mobile-stat"><strong>${todayReport.totalCardTaps||0}</strong><span>Cards today</span></div><div class="mobile-stat"><strong>${data.stars}</strong><span>All-time stars</span></div></div>
       <div class="mobile-section-title"><h2>Memories & growth</h2></div>
       <div class="mobile-memory-grid"><button class="mobile-memory-button" type="button" data-mobile-memory-open="voice"><span>🎤</span>Voice Journey</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="timeline"><span>🌈</span>Growth Timeline</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="letters"><span>💌</span>Future Letters</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="growth"><span>🌱</span>Growth Paths</button></div>
       <div class="mobile-profile-summary"><span>${profile.avatar||"🌟"}</span><div><small>Active child profile</small><h2>${esc(profile.name)}</h2></div></div>
@@ -1632,7 +1712,7 @@
         </details>
       </div>
       <div class="mobile-profile-actions"><button class="mobile-button secondary" type="button" data-action="add-profile"><span>➕</span><strong>Add another profile</strong><small>Create a separate private journey</small></button><button class="mobile-button secondary" type="button" data-route="quickTalkVoices"><span>🎙️</span><strong>Parent Card Voices</strong><small>Quick Talk, Feelings, and Calm & Sensory</small></button><button class="mobile-button secondary" type="button" data-route="parentVoiceLibrary"><span>🎧</span><strong>Parent Voice Library</strong><small>Search, filter, and manage private card voices</small></button><button class="mobile-button secondary" type="button" data-route="communication"><span>💬</span><strong>All Communication Cards</strong><small>Manage custom cards and existing family voices</small></button></div>
-      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button secondary" type="button" data-route="videoApprovals">📨 Video Approval Requests</button><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button><button class="mobile-button secondary" type="button" data-action="export">⬇ Export progress</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
+      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button" type="button" data-route="dailyReports">📊 Daily Reports</button><button class="mobile-button secondary" type="button" data-route="videoApprovals">📨 Video Approval Requests</button><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
     </section>`;
   }
 
@@ -1740,7 +1820,7 @@
     catch{toast("That audio file could not be saved.");}
   }
 
-  async function speakExact(text,cardCategory="",cardId=""){
+  async function speakExact(text,cardCategory="",cardId="",dailyEventId=""){
     const generation=++speechGeneration;
     BB.speech.stop();BB.parentVoices.stop();window.speechSynthesis?.cancel();
     const eligible=BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory);
@@ -1755,18 +1835,20 @@
       customPlayed=parentRecord?await BB.parentVoices.playBlob(parentRecord.blob,BB.store.data.settings.speechVolume):false;
     }
     if(generation!==speechGeneration)return;
-    if(customPlayed)return;
+    if(customPlayed){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"parent");return;}
     const played=await BB.speech.speak(text);
     if(generation!==speechGeneration){BB.speech.stop();return;}
-    if(played)return;
+    if(played){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"default");return;}
     if(BB.store.data.settings.speech&&"speechSynthesis" in window&&"SpeechSynthesisUtterance" in window){
       const utterance=new SpeechSynthesisUtterance(text);
       utterance.lang=BB.store.data.settings.language||"en-US";
       utterance.rate=Math.max(.6,Math.min(1.25,BB.store.data.settings.speechRate||.86));
       utterance.volume=Math.max(0,Math.min(1,BB.store.data.settings.speechVolume||.9));
       window.speechSynthesis.speak(utterance);
+      if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"text-to-speech");
       return;
     }
+    if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"visual");
     toast(`No voice is available right now for “${text}”`);
   }
 
@@ -1777,7 +1859,7 @@
       quizAttempts++;const difficulty=BB.store.data.settings.difficulty||"starter",promptLevel=BB.mobileTools.promptLevel();document.querySelectorAll("[data-answer]").forEach((button,i)=>{if(i===index)button.classList.add("tried");if(i===round.answer&&(difficulty==="starter"||promptLevel==="full"||(difficulty==="growing"&&quizAttempts>=2)))button.classList.add("hint");});
       BB.audio.tryAgain();pip("Good try. Look for the highlighted answer and try again.","🙂","Try again");return;
     }
-    quizLocked=true;BB.audio.success();BB.rewards.earn(currentGame.title);BB.rewards.recordProgress(currentGame.id);
+    quizLocked=true;BB.audio.success();BB.rewards.earn(currentGame.title);BB.rewards.recordProgress(currentGame.id);BB.dailyReports.recordGoal(activeProfile().id,currentGame.title);
     BB.memoryJourney?.track("learning","First learning activity completed",{icon:"📚",detail:currentGame.title,onceKey:"first-learning"});
     const target=document.querySelector("#quiz-result");
     target.innerHTML=`<div class="mobile-success"><div>🥳</div><h2>You found it!</h2><p>${esc(round.fact)}</p><button class="mobile-button" type="button" data-action="quiz-next">${roundIndex===currentGame.rounds.length-1?"Finish":"Next"}</button></div>`;
@@ -1811,14 +1893,93 @@
     pip("Breathe in slowly. Now breathe out slowly.","😌");
   }
 
-  function exportProgress(){
+  function downloadFile(blob,name){
+    const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),500);
+  }
+
+  function exportRawSupport(){
     const link=document.createElement("a"),blob=new Blob([BB.store.exportData()],{type:"application/json"});
-    link.href=URL.createObjectURL(blob);link.download=`brightbridge-progress-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),500);
+    link.href=URL.createObjectURL(blob);link.download=`brightbridge-technical-support-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),500);
+  }
+
+  function reportsForExport(button){
+    const date=button.dataset.reportDate,profileId=button.dataset.reportProfile||reportProfile||activeProfile().id;
+    if(date)return BB.dailyReports.records({profileId,startDate:date,endDate:date});
+    if(button.dataset.reportScope==="all")return BB.dailyReports.records({profileId});
+    return reportList();
+  }
+
+  function printableReportHtml(reports){
+    const content=reports.map(report=>{
+      const text=BB.dailyReports.formatText(report,{childName:BB.dailyReports.profileName(report.childProfileId)});
+      const lines=text.split("\n");let html="";
+      lines.forEach((line,index)=>{
+        if(!line){html+="<div class='space'></div>";return;}
+        if(index===0){html+=`<h1>${esc(line)}</h1>`;return;}
+        if(/^[A-Z][A-Z AND-]+$/.test(line)){html+=`<h2>${esc(line)}</h2>`;return;}
+        html+=`<p>${esc(line)}</p>`;
+      });
+      return `<article>${html}</article>`;
+    }).join("");
+    return `<!doctype html><html><head><meta charset="utf-8"><title>BrightBridge Daily Report</title><style>body{margin:0;background:#fff;color:#1f3048;font:15px/1.45 Arial,sans-serif}main{max-width:780px;margin:auto;padding:32px}article{page-break-after:always}article:last-child{page-break-after:auto}h1{font-size:24px;border-bottom:3px solid #7055b8;padding-bottom:10px}h2{margin-top:22px;padding:7px 10px;background:#eee9fb;font-size:17px}p{margin:4px 0;white-space:pre-wrap}.space{height:9px}.brand{color:#7055b8;font-weight:bold}@media print{main{max-width:none;padding:12mm}h1,h2{break-after:avoid}p{orphans:3;widows:3}}@page{margin:14mm}</style></head><body><main><div class="brand">BrightBridge</div>${content}</main><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),150));<\/script></body></html>`;
+  }
+
+  function exportParentReport(button){
+    try{
+      const reports=reportsForExport(button);
+      if(!reports.length){toast("No reports are available for that selection.");return;}
+      const type=button.dataset.reportExport,first=reports.at(-1).reportDate,last=reports[0].reportDate,period=first===last?first:`${first}-to-${last}`,name=BB.dailyReports.safeFileName(BB.dailyReports.profileName(reports[0].childProfileId));
+      if(type==="print"){
+        const printWindow=window.open("","_blank");
+        if(!printWindow){toast("The report was created, but it could not be shared. Please try again.");return;}
+        printWindow.document.open();printWindow.document.write(printableReportHtml(reports));printWindow.document.close();return;
+      }
+      if(type==="csv"){downloadFile(new Blob([BB.dailyReports.csv(reports)],{type:"text/csv;charset=utf-8"}),`brightbridge-${name}-${period}.csv`);return;}
+      const text=reports.map(report=>BB.dailyReports.formatText(report,{childName:BB.dailyReports.profileName(report.childProfileId)})).join("\n\n\f\n\n");
+      downloadFile(new Blob([text],{type:"text/plain;charset=utf-8"}),`brightbridge-${name}-${period}.txt`);
+    }catch{
+      toast("We could not create the report right now. Your child’s saved information has not been deleted.");
+    }
   }
 
   function handleClick(event){
     const routeButton=event.target.closest("[data-route]");
     if(routeButton){go(routeButton.dataset.route);return;}
+    const reportViewButton=event.target.closest("[data-report-view]");
+    if(reportViewButton&&parentUnlocked){reportView=reportViewButton.dataset.reportView;view.innerHTML=renderDailyReports();resetPageScroll();return;}
+    const reportExportButton=event.target.closest("[data-report-export]");
+    if(reportExportButton&&parentUnlocked){exportParentReport(reportExportButton);return;}
+    const reportNoteButton=event.target.closest("[data-report-note-save]");
+    if(reportNoteButton&&parentUnlocked){
+      const reportDate=reportNoteButton.dataset.reportNoteSave,profileId=reportNoteButton.dataset.reportProfile;
+      const noteInput=[...document.querySelectorAll("[data-report-note]")].find(input=>input.dataset.reportNote===reportDate&&input.dataset.reportNoteProfile===profileId);
+      if(noteInput?.value.trim()){BB.dailyReports.addParentNote(profileId,reportDate,noteInput.value);view.innerHTML=renderDailyReports();toast("Parent note saved.");}
+      else toast("Write a note before saving.");
+      return;
+    }
+    const reportReviewedButton=event.target.closest("[data-report-reviewed]");
+    if(reportReviewedButton&&parentUnlocked){
+      const profileId=reportReviewedButton.dataset.reportProfile,reportDate=reportReviewedButton.dataset.reportReviewed;
+      const report=BB.dailyReports.records({profileId}).find(item=>item.reportDate===reportDate);
+      if(report){BB.dailyReports.updateRecord(profileId,reportDate,{reviewed:!report.reviewed},report.reviewed?"Report review removed":"Report marked reviewed");view.innerHTML=renderDailyReports();}
+      return;
+    }
+    const reportNoteEditButton=event.target.closest("[data-report-note-edit]");
+    if(reportNoteEditButton&&parentUnlocked){
+      const profileId=reportNoteEditButton.dataset.reportProfile,reportDate=reportNoteEditButton.dataset.reportDate,index=Number(reportNoteEditButton.dataset.reportNoteEdit);
+      const report=BB.dailyReports.records({profileId,startDate:reportDate,endDate:reportDate})[0],current=report?.parentNotes?.[index];
+      if(current){
+        const corrected=prompt("Correct this parent note:",current.text);
+        if(corrected!==null&&BB.dailyReports.editParentNote(profileId,reportDate,index,corrected)){view.innerHTML=renderDailyReports();toast("Parent note corrected. The correction was recorded.");}
+      }
+      return;
+    }
+    const reportExcludeButton=event.target.closest("[data-report-exclude]");
+    if(reportExcludeButton&&parentUnlocked){
+      BB.dailyReports.togglePhraseExclusion(reportExcludeButton.dataset.reportProfile,reportExcludeButton.dataset.reportDate,reportExcludeButton.dataset.reportExclude);
+      view.innerHTML=renderDailyReports();toast("Report correction saved.");
+      return;
+    }
     const videoCategoryButton=event.target.closest("[data-video-category]");
     if(videoCategoryButton){videoCategory=videoCategoryButton.dataset.videoCategory;view.innerHTML=renderVideos();resetPageScroll();return;}
     const videoPlay=event.target.closest("[data-video-play]");
@@ -1872,7 +2033,7 @@
     const categoryButton=event.target.closest("[data-category]");
     if(categoryButton){if(recorder?.state==="recording"){toast("Stop and save before changing card groups.");return;}category=categoryButton.dataset.category;refreshCommunication();return;}
     const word=event.target.closest("[data-word]");
-    if(word){if(recorder?.state==="recording"){toast("Stop and save before using another card.");return;}const value=word.dataset.word;sentence=sentence.trim()?`${sentence.trim()} ${value}`:value;speakExact(value,word.dataset.voiceCategory||"",word.dataset.voiceCardId||"");BB.store.data.wordUse[value]=(BB.store.data.wordUse[value]||0)+1;BB.store.data.recentWords=[value,...BB.store.data.recentWords.filter(item=>item!==value)].slice(0,12);BB.store.save();BB.memoryJourney?.track("communication","First communication card used",{icon:"⭐",detail:value,onceKey:"first-card"});refreshCommunication();pip(value,"😊");return;}
+    if(word){if(recorder?.state==="recording"){toast("Stop and save before using another card.");return;}const value=word.dataset.word,voiceCategory=word.dataset.voiceCategory||"",voiceCardId=word.dataset.voiceCardId||"";sentence=sentence.trim()?`${sentence.trim()} ${value}`:value;const dailyEventId=BB.dailyReports.recordCard(activeProfile().id,{phrase:value,category:voiceCategory||category,cardId:voiceCardId});speakExact(value,voiceCategory,voiceCardId,dailyEventId);BB.store.data.wordUse[value]=(BB.store.data.wordUse[value]||0)+1;BB.store.data.recentWords=[value,...BB.store.data.recentWords.filter(item=>item!==value)].slice(0,12);BB.store.save();BB.memoryJourney?.track("communication","First communication card used",{icon:"⭐",detail:value,onceKey:"first-card"});refreshCommunication();pip(value,"😊");return;}
     const favorite=event.target.closest("[data-favorite]");
     if(favorite){if(recorder?.state==="recording"){toast("Stop and save before changing favorites.");return;}const value=favorite.dataset.favorite,list=BB.store.data.favorites;list.includes(value)?list.splice(list.indexOf(value),1):list.push(value);BB.store.save();refreshCommunication();return;}
     const customMove=event.target.closest("[data-custom-move]");
@@ -1887,14 +2048,14 @@
     const cards=event.target.closest("[data-cards]");if(cards){currentGame=BB.games[cards.dataset.cards];cardIndex=0;go("flashcards",{game:currentGame.id});return;}
     const play=event.target.closest("[data-play]");if(play){currentGame=BB.games[play.dataset.play];roundIndex=0;quizLocked=false;quizAttempts=0;go("quiz",{game:currentGame.id});return;}
     const answer=event.target.closest("[data-answer]");if(answer){answerQuiz(Number(answer.dataset.answer));return;}
-    const feeling=event.target.closest("[data-feeling]");if(feeling){const [name,detail]=feeling.dataset.feeling.split("|");BB.memoryJourney?.track("emotion","First emotion selected",{icon:"😊",detail:name,onceKey:"first-emotion"});pip(`${name}. ${detail}`,"😊");return;}
-    const sensory=event.target.closest("[data-sensory-mode]");if(sensory){sensoryMode=sensory.dataset.sensoryMode;view.innerHTML=renderCalm();setupSensory();return;}
+    const feeling=event.target.closest("[data-feeling]");if(feeling){const [name,detail]=feeling.dataset.feeling.split("|");BB.dailyReports.recordFeeling(activeProfile().id,name);BB.memoryJourney?.track("emotion","First emotion selected",{icon:"😊",detail:name,onceKey:"first-emotion"});pip(`${name}. ${detail}`,"😊");return;}
+    const sensory=event.target.closest("[data-sensory-mode]");if(sensory){sensoryMode=sensory.dataset.sensoryMode;BB.dailyReports.recordCalm(activeProfile().id,sensoryExperiences[sensoryMode]?.[1]||"Sensory activity");view.innerHTML=renderCalm();setupSensory();return;}
     const instrumentButton=event.target.closest("[data-instrument]");if(instrumentButton){instrument=instrumentButton.dataset.instrument;view.innerHTML=renderMusic();BB.memoryJourney?.track("music","Favorite music discovered",{icon:"🎵",detail:BB.games.music.instruments[instrument].label,onceKey:`music-${instrument}`});return;}
     const note=event.target.closest("[data-note]");if(note){BB.audio.note(Number(note.dataset.note),BB.games.music.instruments[instrument].type);BB.memoryJourney?.track("music","First musical note played",{icon:"🎵",detail:BB.games.music.instruments[instrument].label,onceKey:"first-music"});return;}
     const nature=event.target.closest("[data-nature]");if(nature){const scene=BB.games.nature.scenes.find(item=>item.id===nature.dataset.nature);modal(`<div class="mobile-modal-head"><h2>${scene.icon} ${esc(scene.label)}</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><div style="font-size:55px;text-align:center">${scene.items.join(" ")}</div><p>${esc(scene.fact)}</p><button class="mobile-button" type="button" data-action="close-modal">Done</button>`,scene.label);pip(scene.fact,"😊");return;}
     const routine=event.target.closest("[data-routine]");if(routine){currentRoutine=routine.dataset.routine;completedSteps=new Set();view.innerHTML=renderDaily();return;}
-    const step=event.target.closest("[data-step]");if(step){const index=Number(step.dataset.step);completedSteps.add(index);BB.audio.pop();view.innerHTML=renderDaily();pip(`${BB.games.dailylife.routines[currentRoutine][index][1]}. Nice job!`,"😊");if(completedSteps.size===BB.games.dailylife.routines[currentRoutine].length){BB.rewards.earn(currentRoutine);updateHeader();pip("Routine complete! You followed every step.","🥳");}return;}
-    const social=event.target.closest("[data-social-answer]");if(social){const story=BB.games.socialskills.stories[socialIndex],index=Number(social.dataset.socialAnswer);if(index!==story.answer){social.classList.add("tried");document.querySelectorAll("[data-social-answer]")[story.answer]?.classList.add("hint");BB.audio.tryAgain();pip("Good try. Look for the kind and safe choice.","🙂","Try again");}else{BB.audio.success();BB.rewards.earn("Social skills");document.querySelector("#social-result").innerHTML=`<div class="mobile-success"><div>🤝</div><h2>Kind choice!</h2><p>${esc(story.fact)}</p><button class="mobile-button" type="button" data-action="social-next">Next</button></div>`;updateHeader();pip(story.fact,"🥳","Great job!");}return;}
+    const step=event.target.closest("[data-step]");if(step){const index=Number(step.dataset.step);completedSteps.add(index);BB.audio.pop();view.innerHTML=renderDaily();pip(`${BB.games.dailylife.routines[currentRoutine][index][1]}. Nice job!`,"😊");if(completedSteps.size===BB.games.dailylife.routines[currentRoutine].length){BB.rewards.earn(currentRoutine);BB.dailyReports.recordGoal(activeProfile().id,currentRoutine);updateHeader();pip("Routine complete! You followed every step.","🥳");}return;}
+    const social=event.target.closest("[data-social-answer]");if(social){const story=BB.games.socialskills.stories[socialIndex],index=Number(social.dataset.socialAnswer);if(index!==story.answer){social.classList.add("tried");document.querySelectorAll("[data-social-answer]")[story.answer]?.classList.add("hint");BB.audio.tryAgain();pip("Good try. Look for the kind and safe choice.","🙂","Try again");}else{BB.audio.success();BB.rewards.earn("Social skills");BB.dailyReports.recordGoal(activeProfile().id,"Social skills");document.querySelector("#social-result").innerHTML=`<div class="mobile-success"><div>🤝</div><h2>Kind choice!</h2><p>${esc(story.fact)}</p><button class="mobile-button" type="button" data-action="social-next">Next</button></div>`;updateHeader();pip(story.fact,"🥳","Great job!");}return;}
     const setting=event.target.closest("[data-setting]");if(setting){const key=setting.dataset.setting;BB.store.data.settings[key]=!BB.store.data.settings[key];if(key==="notifications"&&BB.store.data.settings[key]&&window.Notification?.permission==="default")Notification.requestPermission().then(permission=>{if(permission!=="granted"){BB.store.data.settings.notifications=false;BB.store.save();}});BB.store.save();BB.accessibility.apply();view.innerHTML=renderSettings();return;}
     const action=event.target.closest("[data-action]");if(!action)return;
     switch(action.dataset.action){
@@ -1927,8 +2088,8 @@
       case "card-hear":{const card=currentGame.cards[cardIndex];speakExact(`${card.word}. ${card.detail}`);break;}
       case "trace-clear":{const canvas=document.querySelector("[data-trace-canvas]");canvas?.getContext("2d").clearRect(0,0,canvas.width,canvas.height);break;}
       case "quiz-next":if(roundIndex===currentGame.rounds.length-1)go("learning");else{roundIndex++;quizLocked=false;quizAttempts=0;view.innerHTML=renderQuiz();}break;
-      case "breathe":showBreathing();break;
-      case "calm-music":BB.audio.startCalmMusic();toast("Calm music started");break;
+      case "breathe":BB.dailyReports.recordCalm(activeProfile().id,"Breathing activity");showBreathing();break;
+      case "calm-music":BB.dailyReports.recordCalm(activeProfile().id,"Calm music");BB.audio.startCalmMusic();toast("Calm music started");break;
       case "stop-music":BB.audio.stopMusic();toast("Music stopped");break;
       case "social-next":socialIndex=(socialIndex+1)%BB.games.socialskills.stories.length;view.innerHTML=renderSocial();break;
       case "open-pin":showPin();break;
@@ -1937,9 +2098,10 @@
       case "save-pin":{const value=document.querySelector("[data-new-pin]")?.value;if(/^\d{4}$/.test(value)){BB.store.data.settings.parentPin=value;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers.");break;}
       case "lock-parent":BB.videoApprovals.closeParent(parentVideoActor);BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;parentUnlocked=false;toast("Grown-up Area locked");go("more",{replace:true});break;
       case "install":if(installPrompt){installPrompt.prompt();installPrompt.userChoice.finally(()=>installPrompt=null);}else modal(`<div class="mobile-modal-head"><h2>Install BrightBridge</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Open your browser menu and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.</p><button class="mobile-button" type="button" data-action="close-modal">Got it</button>`,"Install BrightBridge");break;
-      case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();go("parent",{replace:true});break;}
+      case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();reportProfile=profile.id;BB.dailyReports.startSession(profile.id);go("parent",{replace:true});break;}
       case "delete-profile":{if(BB.store.data.profiles.length<2)break;if(confirm(`Delete ${activeProfile().name}'s profile? Private recordings must be deleted separately.`)){BB.store.data.profiles=BB.store.data.profiles.filter(item=>item.id!==BB.store.data.activeProfile);BB.store.data.activeProfile=BB.store.data.profiles[0].id;BB.store.save();go("parent",{replace:true});}break;}
-      case "export":exportProgress();break;
+      case "export":go("dailyReports");break;
+      case "export-raw":if(parentUnlocked)exportRawSupport();break;
       case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),parentVoiceActor?BB.parentVoices.clear(parentVoiceActor):Promise.resolve(),BB.memoryJourney.clear(),clearCustomCards()]).finally(()=>{if(parentVideoActor)BB.videoApprovals.clear(parentVideoActor);clearApprovedVideos();BB.store.reset();BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;caregiverActor=null;parentUnlocked=false;go("home");});break;
       case "close-modal":closeModal();break;
       case "modal-overlay":if(event.target===action)closeModal();break;
@@ -1953,6 +2115,16 @@
     if(event.target.matches("[data-profile-detail]")){const profile=activeProfile();profile[event.target.dataset.profileDetail]=event.target.value;BB.store.save();}
     if(event.target.matches("[data-range]")){BB.store.data.settings[event.target.dataset.range]=Number(event.target.value);BB.store.save();}
     if(event.target.matches("[data-parent-voice-search]")){parentVoiceQuery=event.target.value;view.innerHTML=renderParentVoiceLibrary();document.querySelector("[data-parent-voice-search]")?.focus();}
+    if(event.target.matches("[data-report-search]")){
+      reportSearch=event.target.value;
+      clearTimeout(reportSearchTimer);
+      reportSearchTimer=setTimeout(()=>{
+        if(route!=="dailyReports")return;
+        view.innerHTML=renderDailyReports();
+        const search=document.querySelector("[data-report-search]");
+        if(search){search.focus();search.setSelectionRange(search.value.length,search.value.length);}
+      },220);
+    }
   }
 
   function handleChange(event){
@@ -1963,15 +2135,33 @@
     if(event.target.matches("[data-parent-voice-profile]")&&event.target.checked){const all=document.querySelector("[data-parent-voice-all]");if(all)all.checked=false;}
     if(event.target.matches("[data-approval-confirm],[data-approval-child]"))updateApprovalButton();
     if(event.target.matches("[data-profile-birthday]")){activeProfile().birthDate=event.target.value;BB.store.save();}
-    if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;customLoadedProfile="";BB.store.save();go("parent",{replace:true});}
+    if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;reportProfile=event.target.value;customLoadedProfile="";BB.store.save();BB.dailyReports.startSession(event.target.value);go("parent",{replace:true});}
     if(event.target.matches("[data-setting-select]")){BB.store.data.settings[event.target.dataset.settingSelect]=event.target.value;BB.store.save();}
+    if(event.target.matches("[data-report-filter]")){
+      const filter=event.target.dataset.reportFilter;
+      if(filter==="profile")reportProfile=event.target.value;
+      if(filter==="start")reportStartDate=event.target.value;
+      if(filter==="end")reportEndDate=event.target.value;
+      view.innerHTML=renderDailyReports();
+    }
   }
 
   document.addEventListener("click",handleClick);
   document.addEventListener("input",handleInput);
   document.addEventListener("change",handleChange);
   document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal();if(event.key==="Enter"&&event.target.matches("[data-pin]"))verifyPin();});
-  document.addEventListener("visibilitychange",()=>{if(document.hidden&&parentVoiceRecorder?.state==="recording")stopParentVoiceRecording();});
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden&&parentVoiceRecorder?.state==="recording")stopParentVoiceRecording();
+    if(!document.hidden){
+      BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
+      BB.dailyReports.startSession(activeProfile().id);
+      if(parentUnlocked&&["dailyReports","parent"].includes(route))render();
+    }
+  });
+  window.addEventListener("pageshow",()=>{
+    BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
+    BB.dailyReports.startSession(activeProfile().id);
+  });
   window.addEventListener("bb:reward",()=>{updateHeader();if(BB.store.data.flowers)BB.memoryJourney?.track("reward","First flower grown",{icon:"🌸",onceKey:"first-flower"});if(BB.store.data.butterflies)BB.memoryJourney?.track("reward","First butterfly earned",{icon:"🦋",onceKey:"first-butterfly"});});
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;});
   window.addEventListener("error",event=>{console.error(event.error);toast("Something paused. Please try that touch again.");});
@@ -1982,6 +2172,15 @@
   BB.communicationCatalog={cards:communicationCardModel,duplicateReport:catalogUpgrade.report,findDuplicate:(phrase,cardCategory)=>BB_COMMUNICATION_CARDS.findDuplicate(phrase,cardCategory,aac,customCards)};
   BB.accessibility.apply();
   BB.parentVoices.warm();
+  BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
+  BB.dailyReports.startSession(activeProfile().id);
+  setInterval(()=>{
+    if(!document.hidden){
+      BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
+      BB.dailyReports.startSession(activeProfile().id);
+      BB.dailyReports.addSessionSeconds(activeProfile().id,30);
+    }
+  },30000);
   setInterval(()=>{if(!document.hidden){BB.store.data.screenSeconds+=60;BB.store.save();}},60000);
   const guidedRoute=BB.mobileTools.restoreGuided();
   go(guidedRoute||"home",{replace:true});
