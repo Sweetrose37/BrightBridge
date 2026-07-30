@@ -352,10 +352,60 @@
     return record ? playBlob(record.blob, volume) : false;
   }
 
+  function requirePin(pin) {
+    if (String(pin) !== String(BB.store?.data?.settings?.parentPin || "")) {
+      throw new Error("Parent authorization is required.");
+    }
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      if (!(blob instanceof Blob)) { resolve(""); return; }
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function exportAll(pin) {
+    requirePin(pin);
+    return Promise.all((await allRecords()).map(async ({ blob, ...record }) => ({
+      ...record,
+      audioDataUrl: await blobToDataUrl(blob)
+    })));
+  }
+
+  async function importAll(pin, records = []) {
+    requirePin(pin);
+    stop();
+    await withStore(storeName, "readwrite", store => store.clear());
+    if ((await database()).objectStoreNames.contains(legacyStoreName)) {
+      await withStore(legacyStoreName, "readwrite", store => store.clear());
+    }
+    for (const item of records) {
+      if (!item?.audioDataUrl) continue;
+      const { audioDataUrl, ...record } = item;
+      const blob = await fetch(audioDataUrl).then(response => response.blob());
+      if (!record.recordingId || !record.cardId || !record.phrase || !blob.size) continue;
+      await withStore(storeName, "readwrite", store => store.put({
+        ...record,
+        normalizedPhrase: record.normalizedPhrase || normalize(record.phrase),
+        childProfileIds: record.childProfileIds?.length ? record.childProfileIds : ["*"],
+        blob,
+        fileType: blob.type || record.fileType || "audio/webm",
+        enabled: record.enabled !== false
+      }));
+    }
+    playbackCache = await withStore(storeName, "readonly", store => store.getAll());
+    cacheReady = true;
+    return playbackCache.length;
+  }
+
   window.BB = window.BB || {};
   BB.parentVoices = {
     authorize, close, save, list, getForParent, remove, clear,
     getForChild, playForChild, playForParent, playBlob, stop, pause, resume,
-    cardIdentity, warm, getCachedForChild
+    cardIdentity, warm, getCachedForChild, exportAll, importAll
   };
 })();

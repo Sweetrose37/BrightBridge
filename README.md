@@ -54,7 +54,9 @@ Desktop presentation remains unchanged. Mobile tools include:
 - A persistent `I need a break` button with breathing, quiet play, and AAC.
 - PIN-protected guided child mode that stays inside one selected activity.
 - Private communication insights and suggested next recordings.
-- Complete backup and restore for profiles, progress, voices, and photo cards.
+- Complete backup and restore for profiles, progress, exact-card parent voices,
+  child practice recordings, custom books, custom cards, video approvals,
+  photos, letters, and Voice Journey memories.
 
 Incorrect choices never remove rewards. Pip gives a visual clue, names the
 intended answer, and invites the child to try again.
@@ -90,8 +92,9 @@ Voice Journey recordings, private letters, and letter photos use their own local
 IndexedDB. LumiTalk does not translate, decode, interpret, diagnose, or
 infer thoughts or emotions from a child’s vocalizations; all Voice Journey
 organization comes from information entered by a caregiver.
-The mobile complete-backup tool can package settings, progress, recordings, and
-photos into one parent-PIN-protected download workflow. The Grown-up Area also
+The mobile complete-backup tool can package settings, progress, recordings,
+custom content, video approvals, and photos into one parent-protected download
+workflow. The Grown-up Area also
 offers an AES-GCM encrypted private-memory backup protected by a caregiver
 passphrase. Nothing is sent to a server.
 

@@ -451,6 +451,7 @@
   let cancelParentVoiceCapture=false;
   let editingCustomId="";
   let speechGeneration=0;
+  let lastTeachingSpeech=null;
   let reportProfile="";
   let reportStartDate="";
   let reportEndDate="";
@@ -525,6 +526,11 @@
 
   function saveApprovedVideos(){
     localStorage.setItem("brightbridge-approved-videos-v1",JSON.stringify(approvedVideos));
+  }
+  function exportApprovedVideos(){return approvedVideos.map(video=>({...video}));}
+  function importApprovedVideos(videos=[]){
+    approvedVideos=(videos||[]).map(normalizeVideo);
+    saveApprovedVideos();
   }
 
   function clearApprovedVideos(){
@@ -1096,6 +1102,21 @@
   async function clearCustomCards(){
     try{await customStore("readwrite",store=>store.clear());}catch{}
     releaseCustomPhotos();customCards=[];customLoadedProfile="";
+  }
+
+  async function exportCustomCards(){
+    const records=await customStore("readonly",store=>store.getAll());
+    return Promise.all((records||[]).map(async({photo,...item})=>({...item,photoDataUrl:photo?await blobToDataUrl(photo):""})));
+  }
+
+  async function importCustomCards(records=[]){
+    await clearCustomCards();
+    for(const item of records){
+      if(!item?.id||!item?.label)continue;
+      const {photoDataUrl,...record}=item,photo=photoDataUrl?await dataUrlBlob(photoDataUrl):null;
+      await customStore("readwrite",store=>store.put({...record,photo}));
+    }
+    customLoadedProfile="";
   }
 
   async function updateCustomOrder(id,direction){
@@ -1846,6 +1867,7 @@
   }
 
   async function speakExact(text,cardCategory="",cardId="",dailyEventId="",legacyAliases=[],rateOverride=null){
+    lastTeachingSpeech={text,cardCategory,cardId,legacyAliases:[...legacyAliases],rateOverride};
     const generation=++speechGeneration;
     BB.speech.stop();BB.parentVoices.stop();window.speechSynthesis?.cancel();
     const eligible=BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory);
@@ -2091,7 +2113,10 @@
     const setting=event.target.closest("[data-setting]");if(setting){const key=setting.dataset.setting;BB.store.data.settings[key]=!BB.store.data.settings[key];if(key==="notifications"&&BB.store.data.settings[key]&&window.Notification?.permission==="default")Notification.requestPermission().then(permission=>{if(permission!=="granted"){BB.store.data.settings.notifications=false;BB.store.save();}});BB.store.save();BB.accessibility.apply();view.innerHTML=renderSettings();return;}
     const action=event.target.closest("[data-action]");if(!action)return;
     switch(action.dataset.action){
-      case "repeat-pip":BB.speech.repeat();break;
+      case "repeat-pip":
+        if(lastTeachingSpeech)speakExact(lastTeachingSpeech.text,lastTeachingSpeech.cardCategory,lastTeachingSpeech.cardId,"",lastTeachingSpeech.legacyAliases,lastTeachingSpeech.rateOverride);
+        else BB.speech.repeat();
+        break;
       case "voice-setup":toggleVoiceSetup();break;
       case "custom-add":addCustomCard();break;
       case "custom-edit-cancel":editingCustomId="";refreshCommunication();break;
@@ -2217,6 +2242,7 @@
     pauseTeachingAudio:()=>{const parentPaused=BB.parentVoices.pause(),libraryPaused=BB.voiceLibrary.pause(),ttsPaused=Boolean(window.speechSynthesis?.speaking&&!window.speechSynthesis.paused&&(window.speechSynthesis.pause(),true));return Boolean(parentPaused||libraryPaused||ttsPaused);},
     resumeTeachingAudio:async()=>Boolean((await BB.parentVoices.resume())||(await BB.voiceLibrary.resume())||(window.speechSynthesis?.paused&&(window.speechSynthesis.resume(),true))),
     openParentVoiceEditor,
+    exportCustomCards,importCustomCards,exportApprovedVideos,importApprovedVideos,
     listParentVoices:async categoryId=>{
       if(!parentVoiceActor)return [];
       const records=await BB.parentVoices.list(parentVoiceActor);

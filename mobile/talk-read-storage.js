@@ -146,6 +146,39 @@
     await Promise.all([clearStore(attemptsStore),clearStore(booksStore)]);
   }
 
+  function blobToDataUrl(blob){
+    return new Promise((resolve,reject)=>{
+      if(!(blob instanceof Blob)){resolve("");return;}
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=()=>reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function exportAll(){
+    const savedAttempts=await withStore(attemptsStore,"readonly",store=>store.getAll());
+    const savedBooks=await withStore(booksStore,"readonly",store=>store.getAll());
+    return {
+      attempts:await Promise.all(savedAttempts.map(async({blob,...item})=>({...item,audioDataUrl:await blobToDataUrl(blob)}))),
+      books:savedBooks
+    };
+  }
+
+  async function importAll(payload={}){
+    await clearAll();
+    for(const item of payload.attempts||[]){
+      if(!item?.audioDataUrl)continue;
+      const {audioDataUrl,...record}=item,blob=await fetch(audioDataUrl).then(response=>response.blob());
+      if(!record.id||!blob.size)continue;
+      await withStore(attemptsStore,"readwrite",store=>store.put({...record,blob}));
+    }
+    for(const book of payload.books||[]){
+      if(!book?.id)continue;
+      await withStore(booksStore,"readwrite",store=>store.put(book));
+    }
+  }
+
   function bookAudioId(bookId,pageId,part="page"){return `talk-book:${bookId}:${pageId}:${part}`;}
   function lessonAudioId(lessonId,promptId){return `talk-lesson:${lessonId}:${promptId}`;}
 
@@ -154,6 +187,6 @@
     rootState,profile,save,markLesson,markBook,toggleFavorite,
     setTemporaryAttempt,getTemporaryAttempt,clearTemporaryAttempt,
     saveAttempt,attempts,removeAttempt,clearAttempts,
-    saveCustomBook,customBooks,removeCustomBook,clearAll,bookAudioId,lessonAudioId
+    saveCustomBook,customBooks,removeCustomBook,clearAll,exportAll,importAll,bookAudioId,lessonAudioId
   };
 })();

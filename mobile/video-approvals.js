@@ -219,6 +219,23 @@
     const ownIds=new Set(state.requests.filter(item=>item.requesterId===actor.id).map(item=>item.requestId));
     return clone(state.notifications.filter(item=>item.targetRole==="Caregiver"&&ownIds.has(item.requestId)));
   }
+  function requirePin(pin){
+    if(String(pin)!==String(BB.store?.data?.settings?.parentPin||""))throw new Error("Parent authorization required.");
+  }
+  function exportAll(pin){requirePin(pin);return clone(state);}
+  function importAll(pin,payload){
+    requirePin(pin);
+    if(!payload||!Array.isArray(payload.requests)||!Array.isArray(payload.audit))throw new Error("Invalid video approval backup.");
+    const fresh=initial();
+    state={
+      ...fresh,...clone(payload),
+      settings:{...fresh.settings,...clone(payload.settings||{})},
+      requests:clone(payload.requests),
+      audit:clone(payload.audit),
+      notifications:Array.isArray(payload.notifications)?clone(payload.notifications):[]
+    };
+    save();
+  }
   function clear(actor){requireParent(actor);state=initial();save();}
 
   const isLocal=["localhost","127.0.0.1"].includes(location.hostname);
@@ -240,6 +257,6 @@
   BB.videoApprovals={
     statuses,caregiverRoles,authorizeParent,closeParent,setCaregiverCode,hasCaregiverCode,authorizeCaregiver,closeCaregiver,
     setParentIdentity,settings,submit,ownRequests,edit,resubmit,withdraw,parentRequests,openRequest,approve,reject,
-    requestChanges,removeApproval,auditForParent,notifications,clear
+    requestChanges,removeApproval,auditForParent,notifications,exportAll,importAll,clear
   };
 })();

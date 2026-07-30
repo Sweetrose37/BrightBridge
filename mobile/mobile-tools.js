@@ -52,7 +52,7 @@
     const tools=state();
     return `<div class="mobile-panel"><h2>Guided Child Mode</h2><p>Keep the phone inside one selected activity until a caregiver exits.</p><label class="mobile-tool-label">Activity<select data-mt-guided-route>${[["communication","Communication"],["learning","Learning"],["calm","Feelings & Calm"],["music","Music"],["daily","Daily Living"]].map(([id,label])=>`<option value="${id}" ${tools.guidedRoute===id?"selected":""}>${label}</option>`).join("")}</select></label><button class="mobile-button" type="button" data-mt-action="start-guided">Start guided mode</button></div>
       <div class="mobile-panel"><h2>Prompt level</h2><p>Gradually reduce clues while keeping every response kind.</p><div class="mobile-category-row">${[["full","Full clues"],["gentle","Gentle clues"],["independent","Independent try"]].map(([id,label])=>`<button class="mobile-chip ${tools.promptLevel===id?"active":""}" type="button" data-mt-prompt="${id}">${label}</button>`).join("")}</div></div>
-      <div class="mobile-panel"><h2>Complete Private Backup</h2><p>Save profiles, settings, progress, family voices, photos, letters, and Voice Journey recordings. Nothing uploads automatically.</p><div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-mt-action="backup">Download backup</button><button class="mobile-button secondary" type="button" data-mt-action="encrypted-backup">Encrypted backup</button><label class="mobile-button secondary">Restore backup<input class="sr-only" type="file" accept=".json,.lumitalk,.brightbridge,application/json" data-mt-restore></label></div></div>`;
+      <div class="mobile-panel"><h2>Complete Private Backup</h2><p>Save profiles, progress, exact-card parent voices, child practice recordings, custom books, custom cards, photos, letters, and Voice Journey recordings. Nothing uploads automatically.</p><div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-mt-action="backup">Download backup</button><button class="mobile-button secondary" type="button" data-mt-action="encrypted-backup">Encrypted backup</button><label class="mobile-button secondary">Restore backup<input class="sr-only" type="file" accept=".json,.lumitalk,.brightbridge,application/json" data-mt-restore></label></div></div>`;
   }
 
   function photoDatabase(){
@@ -107,7 +107,18 @@
   async function backup(encrypted=false){
     BB.app.toast("Preparing private backup…");
     try{
-      const payload={format:"LumiTalk Mobile Backup",version:3,createdAt:new Date().toISOString(),state:BB.store.data,voices:await BB.voiceLibrary.exportAll(),photos:await exportPhotos(),memories:await BB.memoryJourney.exportAll()};
+      const payload={
+        format:"LumiTalk Mobile Backup",version:4,createdAt:new Date().toISOString(),
+        state:BB.store.data,
+        voices:await BB.voiceLibrary.exportAll(),
+        parentVoices:BB.parentVoices?.exportAll?await BB.parentVoices.exportAll(BB.store.data.settings.parentPin):[],
+        practiceAndBooks:BB.talkReadStorage?.exportAll?await BB.talkReadStorage.exportAll():{},
+        customCards:BB.app?.exportCustomCards?await BB.app.exportCustomCards():[],
+        approvedVideos:BB.app?.exportApprovedVideos?BB.app.exportApprovedVideos():[],
+        videoApprovals:BB.videoApprovals?.exportAll?BB.videoApprovals.exportAll(BB.store.data.settings.parentPin):null,
+        photos:await exportPhotos(),
+        memories:await BB.memoryJourney.exportAll()
+      };
       if(!encrypted){download(new Blob([JSON.stringify(payload)],{type:"application/json"}),`lumitalk-complete-${new Date().toISOString().slice(0,10)}.lumitalk.json`);return;}
       const passphrase=prompt("Create a backup passphrase. It cannot be recovered if forgotten:");if(!passphrase||passphrase.length<6){BB.app.toast("Use at least six characters for an encrypted backup.");return;}
       const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await encryptionKey(passphrase,salt,["encrypt"]),cipher=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(JSON.stringify(payload)))),envelope={format:"LumiTalk Encrypted Backup",version:1,salt:bytesToBase64(salt),iv:bytesToBase64(iv),cipher:bytesToBase64(cipher)};
@@ -121,7 +132,15 @@
       if(!["LumiTalk Mobile Backup","BrightBridge Mobile Backup","BrightBridge Complete Backup"].includes(payload.format))throw new Error();
       await BB.voiceLibrary.clear();await BB.memoryJourney.clear();await clearPhotos().catch(()=>{});
       Object.keys(BB.store.data).forEach(key=>delete BB.store.data[key]);Object.assign(BB.store.data,payload.state);state();BB.store.save();
-      await BB.voiceLibrary.importAll(payload.voices||[]);await importPhotos(payload.photos||[]);await BB.memoryJourney.importAll(payload.memories||{});location.reload();
+      await BB.voiceLibrary.importAll(payload.voices||[]);
+      if(Array.isArray(payload.parentVoices)&&BB.parentVoices?.importAll)await BB.parentVoices.importAll(BB.store.data.settings.parentPin,payload.parentVoices);
+      if(payload.practiceAndBooks&&BB.talkReadStorage?.importAll)await BB.talkReadStorage.importAll(payload.practiceAndBooks);
+      if(Array.isArray(payload.customCards)&&BB.app?.importCustomCards)await BB.app.importCustomCards(payload.customCards);
+      if(Array.isArray(payload.approvedVideos)&&BB.app?.importApprovedVideos)BB.app.importApprovedVideos(payload.approvedVideos);
+      if(payload.videoApprovals&&BB.videoApprovals?.importAll)BB.videoApprovals.importAll(BB.store.data.settings.parentPin,payload.videoApprovals);
+      await importPhotos(payload.photos||[]);
+      await BB.memoryJourney.importAll(payload.memories||{});
+      location.reload();
     }catch{BB.app.toast("That backup file could not be restored.");}
   }
   function showChoices(){

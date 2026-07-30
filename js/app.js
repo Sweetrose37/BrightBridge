@@ -745,7 +745,7 @@
   document.addEventListener("change",event=>{if(event.target.matches("[data-voice-card-file]"))saveCardVoiceUpload(event.target);});
   document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal();});
   document.addEventListener("keydown",event=>{if(event.key==="Enter"&&event.target.matches("[data-pin-input]"))verifyParentPin();});
-  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;document.querySelector('[data-action="install"]').hidden=false;});
+  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;});
   window.addEventListener("bb:reward",() => updateHeader());
   window.addEventListener("bb:voice-sequence",event=>toast(`Playing ${event.detail.count} matching family recordings in order.`));
   window.addEventListener("error",event=>{console.error(event.error);toast("Something paused. Please try that touch again.");});

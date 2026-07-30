@@ -49,7 +49,8 @@ At widths up to 720 pixels:
 7. Test all prompt-fading levels with a non-target learning response.
 8. Start Guided Mode, verify normal navigation disappears, and exit with the PIN.
 9. Export a complete backup, add disposable data, restore the backup, and verify
-   profiles, settings, recordings, and photos.
+   profiles, settings, exact-card parent voices, child practice recordings,
+   custom books, custom AAC cards, video approvals, memories, and photos.
 10. Resize above 720 pixels and confirm all new mobile controls disappear without
     changing the original desktop layout.
 
