@@ -1,4 +1,6 @@
-const CACHE = "brightbridge-v38";
+// Keep the legacy cache prefix so installed users upgrade in place without
+// disrupting locally stored progress or recordings.
+const CACHE = "brightbridge-v39";
 const CORE = [
   "./",
   "./index.html",
@@ -48,6 +50,10 @@ const CORE = [
   "./games/dailylife.js",
   "./games/socialskills.js",
   "./assets/icons/icon.svg",
+  "./assets/icons/icon-legacy.svg",
+  "./assets/icons/lumitalk-mark.svg",
+  "./assets/icons/lumitalk-wordmark.svg",
+  "./assets/icons/lumitalk-report-logo.svg",
   "./data/animals.json",
   "./data/colors.json",
   "./data/emotions.json",

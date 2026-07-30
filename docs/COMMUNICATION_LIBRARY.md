@@ -1,8 +1,8 @@
-# BrightBridge Mobile Communication Library
+# LumiTalk Mobile Communication Library
 
 ## Mobile 29 summary
 
-BrightBridge Mobile now contains 450 built-in communication cards across 31
+LumiTalk Mobile now contains 450 built-in communication cards across 31
 categories. The previous 162 built-in cards remain available. New card packs
 cover Quick Talk, needs, pain and body, food and drink, people, places,
 activities, sensory and calming, social communication, routines, school and

@@ -1,6 +1,6 @@
 # Deployment guide
 
-BrightBridge is a static application with no build step.
+LumiTalk is a static application with no build step.
 
 ## Requirements
 

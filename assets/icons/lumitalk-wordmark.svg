@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="LumiTalk">
+  <g transform="translate(8 4) scale(.42)">
+    <path d="M104 102h304c35 0 64 29 64 64v176c0 35-29 64-64 64H263l-86 66 17-66h-90c-35 0-64-29-64-64V166c0-35 29-64 64-64Z" fill="#EAF4FD" stroke="#4A90E2" stroke-width="24" stroke-linejoin="round"/>
+    <path d="M119 319c42-86 105-129 190-129 35 0 68 8 98 25" fill="none" stroke="#6FD6A8" stroke-width="34" stroke-linecap="round"/>
+    <path d="M121 320h286" fill="none" stroke="#245B8F" stroke-width="20" stroke-linecap="round"/>
+    <path d="m385 122 14 30 33 4-24 23 6 33-29-16-29 16 6-33-24-23 33-4Z" fill="#FFD75E" stroke="#245B8F" stroke-width="8"/>
+  </g>
+  <text x="230" y="151" font-family="Trebuchet MS, Segoe UI, sans-serif" font-size="112" font-weight="800" fill="#4A90E2">Lumi</text>
+  <text x="465" y="151" font-family="Trebuchet MS, Segoe UI, sans-serif" font-size="112" font-weight="800" fill="#6FD6A8">Talk</text>
+</svg>

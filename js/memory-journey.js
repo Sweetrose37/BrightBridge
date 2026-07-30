@@ -194,7 +194,7 @@
     try {
       content=await waitForRender((renderers[next]||renderHub)());
     } catch {
-      content=shell("Private Memory Studio","The private journal did not finish opening.",`<div class="panel empty-memory"><span>💜</span><h2>Your memories are still safe</h2><p>BrightBridge could not open private storage this time. Nothing was deleted.</p><div class="flash-actions"><button class="primary-button" type="button" data-memory-open="${next}">Try again</button><button class="secondary-button" type="button" data-route="parent">Back to Parent Dashboard</button></div></div>`,next);
+      content=shell("Private Memory Studio","The private journal did not finish opening.",`<div class="panel empty-memory"><span>💜</span><h2>Your memories are still safe</h2><p>LumiTalk could not open private storage this time. Nothing was deleted.</p><div class="flash-actions"><button class="primary-button" type="button" data-memory-open="${next}">Try again</button><button class="secondary-button" type="button" data-route="parent">Back to Parent Dashboard</button></div></div>`,next);
     }
     if(token!==renderToken||!memoryViewActive||BB.navigation.current!=="memory"||!BB.app?.isParentUnlocked?.())return;
     view.innerHTML = content;
@@ -227,9 +227,9 @@
         <button class="memory-feature-card voice" type="button" data-memory-open="voice"><span>🎤</span><div><h2>Voice Journey™</h2><p>Preserve meaningful sounds and caregiver-defined milestones.</p><strong>${voices.length} recordings · ${milestones} milestones</strong></div></button>
         <button class="memory-feature-card timeline" type="button" data-memory-open="timeline"><span>🌈</span><div><h2>Look How Far I’ve Come™</h2><p>A gentle timeline celebrating only this child’s own growth.</p><strong>${computedEvents().length + voices.length + letters.length} memories</strong></div></button>
         <button class="memory-feature-card letters" type="button" data-memory-open="letters"><span>💌</span><div><h2>Letters to My Future Self™</h2><p>Private messages, photos, achievements, and keepsakes.</p><strong>${letters.length} letters</strong></div></button>
-        <button class="memory-feature-card growth" type="button" data-memory-open="growth"><span>${stage.icon}</span><div><h2>BrightBridge Growth Paths™</h2><p>Caregiver-controlled stages that never erase history.</p><strong>${stage.name}</strong></div></button>
+        <button class="memory-feature-card growth" type="button" data-memory-open="growth"><span>${stage.icon}</span><div><h2>LumiTalk Growth Paths™</h2><p>Caregiver-controlled stages that never erase history.</p><strong>${stage.name}</strong></div></button>
       </div>
-      <div class="panel memory-philosophy"><h3>Caregiver promise</h3><p>Voice Journey is a memory journal. BrightBridge never claims to understand, translate, decode, infer thoughts or emotions from, or diagnose a child’s vocalizations. Every title, tag, note, and milestone comes from the caregiver.</p></div>
+      <div class="panel memory-philosophy"><h3>Caregiver promise</h3><p>Voice Journey is a memory journal. LumiTalk never claims to understand, translate, decode, infer thoughts or emotions from, or diagnose a child’s vocalizations. Every title, tag, note, and milestone comes from the caregiver.</p></div>
     `,"hub");
   }
 
@@ -279,7 +279,7 @@
   async function renderVoiceJourney() {
     const voices = await filteredVoices();
     return shell("Voice Journey™","A private, caregiver-authored journal of meaningful vocal moments.",`
-      <div class="privacy-banner compact"><span>🎤</span><div><strong>Memories, not interpretations</strong><p>Recordings are organized only by details a caregiver enters. BrightBridge does not translate or infer meaning from sounds.</p></div></div>
+      <div class="privacy-banner compact"><span>🎤</span><div><strong>Memories, not interpretations</strong><p>Recordings are organized only by details a caregiver enters. LumiTalk does not translate or infer meaning from sounds.</p></div></div>
       <details class="memory-details" open><summary>Add a Voice Journey recording</summary>${voiceForm()}</details>
       <div class="memory-toolbar">
         <label class="search-field"><span class="sr-only">Search recordings</span><input data-vj-search value="${escapeHtml(voiceFilters.query)}" placeholder="Search title, date, age, tags, milestone, or notes"></label>
@@ -478,7 +478,7 @@
         <div><span>📚</span><strong>${Object.values(data.progress).reduce((sum,value)=>sum+value,0)}</strong><small>activities completed</small></div>
         <div><span>💬</span><strong>${Object.values(data.wordUse).reduce((sum,value)=>sum+value,0)}</strong><small>cards used</small></div>
       </div>
-      <div class="growth-timeline">${items.length ? items.map(item=>`<article class="timeline-memory"><span>${item.icon}</span><div><time>${formatDate(item.date)}</time><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.detail||"A meaningful moment")}</p></div></article>`).join("") : `<div class="panel empty-memory"><span>🌱</span><h2>This journey is ready to grow</h2><p>First moments will appear automatically as BrightBridge is used.</p></div>`}</div>
+      <div class="growth-timeline">${items.length ? items.map(item=>`<article class="timeline-memory"><span>${item.icon}</span><div><time>${formatDate(item.date)}</time><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.detail||"A meaningful moment")}</p></div></article>`).join("") : `<div class="panel empty-memory"><span>🌱</span><h2>This journey is ready to grow</h2><p>First moments will appear automatically as LumiTalk is used.</p></div>`}</div>
       <div class="flash-actions"><button class="primary-button" type="button" data-memory-print="full-timeline">Save timeline as PDF</button><button class="secondary-button" type="button" data-memory-slideshow>Play Journey Through Time</button></div>
     `,"timeline");
   }
@@ -618,14 +618,14 @@
 
   function homeBanner() {
     const stage=stages.find(item=>item.id===growthPathState().stage)||stages[0];
-    return `<div class="growth-home-banner"><span>${stage.icon}</span><div><p class="eyebrow">My BrightBridge Growth Path</p><strong>${stage.name}</strong><small>${stage.focus}</small></div></div>`;
+    return `<button class="growth-home-banner" type="button" data-memory-open="growth" aria-label="Open My LumiTalk Growth Path: ${escapeHtml(stage.name)}"><span>${stage.icon}</span><div><p class="eyebrow">My LumiTalk Growth Path</p><strong>${stage.name}</strong><small>${stage.focus}</small></div></button>`;
   }
 
   async function renderGrowthPaths() {
     const path=growthPathState();
     const profile=activeProfile();
     const age=ageFromBirthDate(profile.birthDate);
-    return shell("BrightBridge Growth Paths™","The experience grows with the child while every memory and achievement stays intact.",`
+    return shell("LumiTalk Growth Paths™","The experience grows with the child while every memory and achievement stays intact.",`
       <div class="privacy-banner compact"><span>🌱</span><div><strong>Caregiver-controlled growth</strong><p>Stages may follow age or be chosen independently. Changing a stage never deletes Voice Journey, letters, rewards, progress, or communication history.</p></div></div>
       <div class="setting-group"><h3>Child birthday and progression</h3>
         <label class="setting-row"><span><strong>Birthday</strong><small>Used only on this device for optional age progression and celebrations.</small></span><input class="select" type="date" data-profile-birth value="${escapeHtml(profile.birthDate||"")}"></label>
@@ -754,7 +754,7 @@
     const entries=[];
     entries.push({name:"Voice Journey metadata.json",data:new TextEncoder().encode(JSON.stringify(records.map(({blob,...record})=>record),null,2))});
     for(const record of records)entries.push({name:`audio/${safeFileName(record.title)}.${audioExtension(record.type)}`,data:new Uint8Array(await record.blob.arrayBuffer())});
-    download(createZip(entries),`brightbridge-voice-journey-${new Date().toISOString().slice(0,10)}.zip`);
+    download(createZip(entries),`lumitalk-voice-journey-${new Date().toISOString().slice(0,10)}.zip`);
   }
 
   function audioExtension(type="") {
@@ -798,14 +798,14 @@
     const canvas=document.createElement("canvas");canvas.width=1200;canvas.height=1500;const ctx=canvas.getContext("2d");
     const gradient=ctx.createLinearGradient(0,0,1200,1500);gradient.addColorStop(0,"#ede5ff");gradient.addColorStop(1,"#ddf7f0");ctx.fillStyle=gradient;ctx.fillRect(0,0,1200,1500);
     ctx.fillStyle="#26334c";ctx.textAlign="center";ctx.font="72px system-ui";ctx.fillText("⭐  🌸  🦋",600,180);ctx.font="bold 64px system-ui";ctx.fillText(lines[0],600,310);
-    ctx.font="38px system-ui";lines.slice(1).forEach((line,index)=>ctx.fillText(line,600,470+index*120));ctx.font="bold 34px system-ui";ctx.fillText("BrightBridge — Look How Far I’ve Come™",600,1350);
+    ctx.font="38px system-ui";lines.slice(1).forEach((line,index)=>ctx.fillText(line,600,470+index*120));ctx.font="bold 34px system-ui";ctx.fillText("LumiTalk — Look How Far I’ve Come™",600,1350);
     canvas.toBlob(blob=>download(blob,`happy-birthday-${safeFileName(profile.name)}.png`),"image/png");
   }
 
   async function keepsakeBook() {
     if(!requirePin()){BB.app.toast("That PIN did not match.");return;}
     const profile=activeProfile(),letters=await list("letters"),items=await timelineItems();
-    const body=`<div class="print-cover"><div>💌 🌸 🎤</div><h1>${escapeHtml(profile.name)}’s BrightBridge Keepsake Book</h1><p>Letters, memories, growth, and encouragement</p></div>
+    const body=`<div class="print-cover"><div>💌 🌸 🎤</div><h1>${escapeHtml(profile.name)}’s LumiTalk Keepsake Book</h1><p>Letters, memories, growth, and encouragement</p></div>
       <h1>Journey Timeline</h1>${items.slice().reverse().map(item=>`<article><h2>${item.icon} ${escapeHtml(item.title)}</h2><p>${formatDate(item.date)} · ${escapeHtml(item.detail||"")}</p></article>`).join("")}
       <h1>Letters</h1>${letters.sort((a,b)=>new Date(a.date)-new Date(b.date)).map(letter=>`<article><h2>💌 ${escapeHtml(letter.title)}</h2><p>From ${escapeHtml(letter.author)} · ${formatDate(letter.date)}</p>${letter.body}</article>`).join("")}`;
     printHtml(`${profile.name} Keepsake Book`,body);
@@ -817,14 +817,14 @@
     if(!passphrase||passphrase.length<8){BB.app.toast("Use a passphrase with at least 8 characters.");return;}
     const voices=await list("voices"),letters=await list("letters");
     const encodeBlob=blob=>new Promise((resolve,reject)=>{if(!blob){resolve(null);return;}const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);});
-    const payload={format:"BrightBridge Private Memory Backup",version:1,profile:activeProfile(),state:memoryState(),
+    const payload={format:"LumiTalk Private Memory Backup",version:1,profile:activeProfile(),state:memoryState(),
       voices:await Promise.all(voices.map(async({blob,...record})=>({...record,dataUrl:await encodeBlob(blob)}))),
       letters:await Promise.all(letters.map(async({photo,...record})=>({...record,photoDataUrl:await encodeBlob(photo)})))};
     const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),enc=new TextEncoder();
     const baseKey=await crypto.subtle.importKey("raw",enc.encode(passphrase),"PBKDF2",false,["deriveKey"]);
     const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:250000,hash:"SHA-256"},baseKey,{name:"AES-GCM",length:256},false,["encrypt"]);
     const cipher=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc.encode(JSON.stringify(payload))));
-    download(new Blob([JSON.stringify({format:"BrightBridge Encrypted Memory Backup",version:1,salt:Array.from(salt),iv:Array.from(iv),cipher:bytesToBase64(cipher)})],{type:"application/json"}),`brightbridge-private-memories-${new Date().toISOString().slice(0,10)}.bbsecure`);
+    download(new Blob([JSON.stringify({format:"LumiTalk Encrypted Memory Backup",version:1,salt:Array.from(salt),iv:Array.from(iv),cipher:bytesToBase64(cipher)})],{type:"application/json"}),`lumitalk-private-memories-${new Date().toISOString().slice(0,10)}.bbsecure`);
   }
 
   function bytesToBase64(bytes) {
@@ -845,14 +845,14 @@
     if(!passphrase)return;
     try{
       const packageData=JSON.parse(await file.text());
-      if(packageData.format!=="BrightBridge Encrypted Memory Backup")throw new Error("Invalid backup");
+      if(!["LumiTalk Encrypted Memory Backup","BrightBridge Encrypted Memory Backup"].includes(packageData.format))throw new Error("Invalid backup");
       const enc=new TextEncoder(),dec=new TextDecoder(),salt=new Uint8Array(packageData.salt),iv=new Uint8Array(packageData.iv);
       const baseKey=await crypto.subtle.importKey("raw",enc.encode(passphrase),"PBKDF2",false,["deriveKey"]);
       const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:250000,hash:"SHA-256"},baseKey,{name:"AES-GCM",length:256},false,["decrypt"]);
       const cipher=typeof packageData.cipher==="string"?base64ToBytes(packageData.cipher):new Uint8Array(packageData.cipher);
       const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,cipher);
       const payload=JSON.parse(dec.decode(plain));
-      if(payload.format!=="BrightBridge Private Memory Backup")throw new Error("Invalid payload");
+      if(!["LumiTalk Private Memory Backup","BrightBridge Private Memory Backup"].includes(payload.format))throw new Error("Invalid payload");
       if(!confirm("Restore this encrypted memory backup for the active child profile? Existing Voice Journey recordings and letters for this profile will be replaced."))return;
       const profileId=BB.store.data.activeProfile;
       await clearProfile(profileId);

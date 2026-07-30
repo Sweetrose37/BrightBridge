@@ -1,6 +1,6 @@
 # Weekly and Weekend Rewards
 
-BrightBridge Mobile displays a profile-specific reward-star bank while keeping
+LumiTalk Mobile displays a profile-specific reward-star bank while keeping
 permanent gardens, stickers, achievements, and earlier reward history intact.
 
 ## Monday through Friday
@@ -33,7 +33,7 @@ The CSV columns are named **Stars Collected** and **Weekend Bonus Stars**.
 
 ## Privacy and preservation
 
-The program uses the device’s local date and the existing local BrightBridge
+The program uses the device’s local date and the existing local LumiTalk
 storage. It adds no accounts, cloud upload, advertising, or tracking. Existing
 stars are carried into the first active reward bank during migration instead
 of being discarded.

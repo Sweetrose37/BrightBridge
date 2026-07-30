@@ -17,7 +17,7 @@
       };
       request.onsuccess=()=>resolve(request.result);
       request.onerror=()=>reject(request.error);
-      request.onblocked=()=>reject(new Error("Close other BrightBridge tabs and try again."));
+      request.onblocked=()=>reject(new Error("Close other LumiTalk tabs and try again."));
     }).catch(error=>{databasePromise=null;throw error;});
     return databasePromise;
   }

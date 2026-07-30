@@ -1,5 +1,5 @@
 /*
- * BRIGHTBRIDGE APPROVED VIDEO DATA
+ * LUMITALK APPROVED VIDEO DATA
  * --------------------------------
  * Add owner-approved YouTube video IDs in this file, or use the PIN-protected
  * Video Library controls in the mobile Grown-up Area.

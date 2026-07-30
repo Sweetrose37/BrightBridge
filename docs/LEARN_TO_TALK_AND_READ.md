@@ -1,6 +1,6 @@
 # Learn to Talk & Read
 
-BrightBridge Mobile includes an offline-first child section with two entrances:
+LumiTalk Mobile includes an offline-first child section with two entrances:
 
 - Let’s Practice Talking
 - My Reading Library
@@ -41,7 +41,7 @@ Daily Reports include participation-only information such as lessons opened, sou
 
 ## Dependencies and offline behavior
 
-No new dependency, account, analytics, tracking, or network service was added. Built-in content and code are included in `service-worker.js` cache version `brightbridge-v38`. Parent voices, saved child attempts, and custom books are device-local data.
+No new dependency, account, analytics, tracking, or network service was added. Built-in content and code are included in the current `service-worker.js` cache. Parent voices, saved child attempts, and custom books are device-local data.
 
 ## Manual device checks
 

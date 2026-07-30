@@ -10,6 +10,7 @@
     reducedMotion: ["Reduce motion", "Keep movement and celebrations still"],
     simpleMode: ["Simple mode", "Show fewer choices at one time"],
     colorFriendly: ["Color-friendly palette", "Use colors with stronger differences"],
+    showEncouragementHelper: ["Show Encouragement Helper", "Display the small encouragement strip below activities"],
     notifications: ["Gentle reminders", "Allow optional activity reminders"],
     offlineMode: ["Offline mode", "Keep core activities available without internet"]
   };
@@ -24,7 +25,7 @@
   function render() {
     const settings = BB.store.data.settings;
     return `<section>
-      ${BB.navigation.pageHead("Comfort settings", "Make BrightBridge feel just right.", "home")}
+      ${BB.navigation.pageHead("Comfort settings", "Make LumiTalk feel just right.", "parent")}
       <div class="setting-group"><h3>🔊 Voice & sound</h3>
         ${switchRow("speech")}
         <label class="setting-row"><span><strong>Family voice volume</strong></span><input class="range" type="range" min="0" max="1" step=".05" value="${settings.speechVolume}" data-setting-range="speechVolume"></label>
@@ -37,7 +38,8 @@
         <label class="setting-row"><span><strong>Language</strong></span><select class="select" data-setting-select="language"><option value="en-US" ${settings.language === "en-US" ? "selected" : ""}>English (US)</option><option value="en-GB" ${settings.language === "en-GB" ? "selected" : ""}>English (UK)</option><option value="es-US" ${settings.language === "es-US" ? "selected" : ""}>Español</option></select></label>
         <label class="setting-row"><span><strong>Difficulty</strong><small>Adjusts the number of choices</small></span><select class="select" data-setting-select="difficulty"><option value="starter" ${settings.difficulty === "starter" ? "selected" : ""}>Starter</option><option value="growing" ${settings.difficulty === "growing" ? "selected" : ""}>Growing</option><option value="adventure" ${settings.difficulty === "adventure" ? "selected" : ""}>Adventure</option></select></label>
       </div>
-      <div class="setting-group"><h3>📱 App</h3>${switchRow("offlineMode")}${switchRow("notifications")}</div>
+      <div class="setting-group"><h3>📱 App</h3>${switchRow("showEncouragementHelper")}${switchRow("offlineMode")}${switchRow("notifications")}</div>
+      <div class="setting-group"><h3>About LumiTalk</h3><div class="setting-row"><span><strong>LumiTalk</strong><small>Helping Every Child Find Their Voice.</small></span><span>App Version: 1.0.0</span></div></div>
       <p class="privacy-note">🔒 Your child’s activity stays on this device. No ads. No tracking.</p>
     </section>`;
   }

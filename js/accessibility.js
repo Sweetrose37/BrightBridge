@@ -8,6 +8,7 @@
     document.body.classList.toggle("reduced-motion", settings.reducedMotion);
     document.body.classList.toggle("simple-mode", settings.simpleMode);
     document.body.classList.toggle("color-friendly", settings.colorFriendly);
+    document.body.classList.toggle("hide-encouragement-helper", settings.showEncouragementHelper === false);
     document.documentElement.style.setProperty("--motion-speed", settings.reducedMotion ? "0" : String(settings.animationSpeed || 1));
   }
 

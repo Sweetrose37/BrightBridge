@@ -58,6 +58,7 @@
       animationSpeed: 1,
       simpleMode: false,
       colorFriendly: false,
+      showEncouragementHelper: true,
       notifications: false,
       offlineMode: true,
       language: "en-US",
@@ -111,7 +112,7 @@
       localStorage.setItem(key, JSON.stringify(data));
       window.dispatchEvent(new CustomEvent("bb:state", { detail: data }));
     } catch {
-      // BrightBridge remains usable when private browsing blocks persistence.
+      // LumiTalk remains usable when private browsing blocks persistence.
     }
   }
 
@@ -124,7 +125,7 @@
 
   function exportData() {
     return JSON.stringify({
-      app: "BrightBridge",
+      app: "LumiTalk",
       exportedAt: new Date().toISOString(),
       data
     }, null, 2);

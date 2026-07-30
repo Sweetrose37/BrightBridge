@@ -1,6 +1,6 @@
 # Developer guide
 
-BrightBridge is a framework-free single-page PWA. Scripts are loaded as classic
+LumiTalk is a framework-free single-page PWA. Scripts are loaded as classic
 scripts so the core experience also works when `index.html` is opened directly.
 Every module attaches its public API to `window.BB`.
 

@@ -34,9 +34,7 @@
     ["daily","🪥","Daily Living","Step-by-step routines for every day","#e8f4ff","Routines"],
     ["social","🤝","Social Skills","Greetings, turns, choices, and kindness","#f0e9ff","Together"],
     ["rewards","🌻","Reward Garden","Stars, flowers, stickers, and badges","#fff0c7","Celebrate"],
-    ["progress","📈","My Progress","See everything you have explored","#ddf5ed","Growing"],
-    ["parent","🔒","Grown-up Area","Profiles, reports, and controls","#ececf2","Parents"],
-    ["settings","⚙️","Settings","Sound, comfort, theme, and access","#e8efff","Comfort"]
+    ["progress","📈","My Progress","See everything you have explored","#ddf5ed","Growing"]
   ];
 
   const aac = {
@@ -84,6 +82,7 @@
   }
 
   function render(route, options = {}) {
+    if(route==="settings"&&!parentUnlocked)route="parent";
     if (route !== "communication" && voiceRecorder?.state === "recording") stopVoiceRecording();
     BB.memoryJourney?.cancelView?.();
     updateHeader();
@@ -120,8 +119,8 @@
   function renderHome() {
     const name = BB.store.data.profiles.find(item => item.id === BB.store.data.activeProfile)?.name || "friend";
     return `<section>
-      <div class="hero"><div><p class="eyebrow">Helping every touch become communication</p><h1>Hello, ${escapeHtml(name)}!</h1><p class="lead">Choose a gentle adventure. Pip will show, tell, celebrate, and help whenever you need another try.</p></div><div class="hero-mascot" role="img" aria-label="Pip the smiling guide">😊</div></div>
-      <div class="section-heading"><h2>Where should we go?</h2><span>No timers • No losing • Always kind</span></div>
+      <div class="hero"><div><p class="eyebrow">Welcome back</p><h1>Hello, ${escapeHtml(name)}!</h1><p class="lead">Choose what feels good today. You can always try again.</p></div><div class="hero-mascot" role="img" aria-label="Friendly smile">😊</div></div>
+      <div class="section-heading"><h2>Choose an adventure</h2><span>Tap any card</span></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
       <div class="home-grid">${homeCards.map(([route,icon,title,description,color,tag]) => `<button class="nav-card ${route === "parent" || route === "settings" ? "advanced-only" : ""}" style="--card-color:${color}" type="button" data-route="${route}"><span class="card-tag">${tag}</span><h3>${title}</h3><p>${description}</p><span class="nav-card-icon" aria-hidden="true">${icon}</span></button>`).join("")}</div>
     </section>`;
@@ -402,7 +401,7 @@
       <div class="setting-group" style="margin-top:18px"><h3>👤 Child profiles</h3><label class="setting-row"><span><strong>Active profile</strong></span><select class="select" data-profile-select>${data.profiles.map(profile => `<option value="${profile.id}" ${profile.id === data.activeProfile ? "selected" : ""}>${profile.avatar} ${escapeHtml(profile.name)}</option>`).join("")}</select></label><label class="setting-row"><span><strong>Display name</strong><small>Shown on the home screen</small></span><input class="select" value="${escapeHtml(activeProfile.name)}" data-profile-name maxlength="30"></label><div class="setting-row"><button class="secondary-button" type="button" data-action="add-profile">Add child profile</button></div><label class="setting-row"><span><strong>Difficulty</strong></span><select class="select" data-setting-select="difficulty"><option value="starter" ${data.settings.difficulty === "starter" ? "selected" : ""}>Starter</option><option value="growing" ${data.settings.difficulty === "growing" ? "selected" : ""}>Growing</option><option value="adventure" ${data.settings.difficulty === "adventure" ? "selected" : ""}>Adventure</option></select></label></div>
       <div class="setting-group voice-studio"><h3>🎙️ Family Voice Cards</h3><div class="setting-row"><span><strong>Recording now lives with the Communication cards</strong><small>Each recording is linked automatically to the exact card wording, preventing mismatched labels.</small></span><button class="secondary-button" type="button" data-route="communication">Open Communication</button></div></div>
       <div class="setting-group"><h3>📊 Favorite areas</h3>${Object.entries(data.activityVisits).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([name,count])=>`<div class="setting-row"><strong>${name}</strong><span style="margin-left:auto">${count} visits</span></div>`).join("") || '<div class="setting-row">No activity yet</div>'}</div>
-      <div class="flash-actions"><button class="primary-button" type="button" data-action="export">Export progress JSON</button><button class="secondary-button" type="button" data-action="change-pin">Change PIN</button><button class="danger-button" type="button" data-action="reset">Reset all local data</button></div>
+      <div class="flash-actions"><button class="primary-button" type="button" data-action="export">Open progress report</button><button class="secondary-button" type="button" data-route="settings">Sound & Accessibility Settings</button><button class="secondary-button" type="button" data-action="change-pin">Change PIN</button><button class="danger-button" type="button" data-action="reset">Reset all local data</button></div>
     </section>`;
   }
 
@@ -597,8 +596,15 @@
   }
 
   function downloadExport() {
-    const blob = new Blob([BB.store.exportData()], {type:"application/json"});
-    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `brightbridge-progress-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(link.href);
+    const data=BB.store.data;
+    const profile=data.profiles.find(item=>item.id===data.activeProfile)||data.profiles[0];
+    const completed=Object.values(data.progress||{}).reduce((total,value)=>total+(Number(value)||0),0);
+    const visits=Object.entries(data.activityVisits||{}).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const report=window.open("","_blank");
+    if(!report){toast("Allow pop-ups to open the printable report.");return;}
+    report.opener=null;
+    report.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>LumiTalk Child Communication & Learning Report</title><style>body{color:#2E3A46;font:16px/1.5 Arial,sans-serif;margin:0}main{max-width:760px;margin:auto;padding:32px}.brand{color:#245B8F;font-size:22px;font-weight:800;border-bottom:4px solid #4A90E2;padding-bottom:12px}h1{font-size:28px}h2{background:#EAF4FD;padding:9px 12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stats p{background:#F2F5F7;border-radius:12px;padding:14px;text-align:center}.stats strong{display:block;font-size:24px}@media(max-width:520px){.stats{grid-template-columns:1fr}}@media print{main{padding:8mm}}</style></head><body><main><div class="brand">LumiTalk<br><small>Child Communication & Learning Report</small></div><h1>${escapeHtml(profile.name)}</h1><p>Created ${new Date().toLocaleDateString()}</p><div class="stats"><p><strong>${data.stars||0}</strong>Stars earned</p><p><strong>${completed}</strong>Activities completed</p><p><strong>${data.stickers?.length||0}</strong>Stickers collected</p></div><h2>Favorite areas</h2>${visits.length?`<ol>${visits.map(([name,count])=>`<li>${escapeHtml(name)} — ${count} visits</li>`).join("")}</ol>`:"<p>No activity recorded yet.</p>"}<p><em>This report celebrates this child’s own activity and does not compare children.</em></p></main><script>addEventListener("load",()=>setTimeout(()=>print(),150));<\/script></body></html>`);
+    report.document.close();
   }
 
   function handleClick(event) {
@@ -717,7 +723,7 @@
       case "stop-voice-recording": stopVoiceRecording();break;
       case "save-pin": {const pin=document.querySelector("[data-new-pin]").value;if(/^\d{4}$/.test(pin)){BB.store.data.settings.parentPin=pin;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers");}break;
       case "export": downloadExport();break;
-      case "reset": if(confirm("Reset all BrightBridge progress, settings, family voice clips, Voice Journey recordings, and private letters on this device?")){Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear()]).finally(()=>{BB.store.reset();parentUnlocked=false;BB.accessibility.apply();BB.navigation.go("home");});}break;
+      case "reset": if(confirm("Reset all LumiTalk progress, settings, family voice clips, Voice Journey recordings, and private letters on this device?")){Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear()]).finally(()=>{BB.store.reset();parentUnlocked=false;BB.accessibility.apply();BB.navigation.go("home");});}break;
       case "close-modal": closeModal();break;
       case "modal-overlay": if(event.target===action)closeModal();break;
       case "repeat-pip": BB.speech.repeat();break;

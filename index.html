@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-    <meta name="theme-color" content="#7055b8">
-    <meta name="description" content="BrightBridge — a calm offline learning and communication playground for children.">
+    <meta name="theme-color" content="#4A90E2">
+    <meta name="description" content="LumiTalk is a child-friendly AAC communication and learning app.">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <script>
@@ -12,14 +12,14 @@
         location.replace(`mobile/${location.search}${location.hash}`);
       }
     </script>
-    <title>BrightBridge — Helping Every Touch Become Communication</title>
+    <title>LumiTalk — Helping Every Child Find Their Voice.</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="css/style.css?v=14">
+    <link rel="stylesheet" href="css/style.css?v=39">
     <link rel="stylesheet" href="css/themes.css?v=10">
     <link rel="stylesheet" href="css/animations.css?v=10">
     <link rel="stylesheet" href="css/responsive.css?v=14">
-    <link rel="stylesheet" href="css/memory-journey.css?v=10">
+    <link rel="stylesheet" href="css/memory-journey.css?v=39">
   </head>
   <body>
     <a class="skip-link" href="#view">Skip to activity</a>
@@ -27,26 +27,24 @@
     <div class="ambient ambient-two" aria-hidden="true"></div>
 
     <header class="app-header">
-      <button class="brand" type="button" data-route="home" aria-label="BrightBridge home">
-        <span class="brand-mark">B</span>
+      <button class="brand" type="button" data-route="home" aria-label="LumiTalk home">
+        <img class="brand-mark" src="assets/icons/lumitalk-mark.svg" alt="">
         <span class="brand-copy">
-          <strong>BrightBridge</strong>
-          <small>Every touch can say something</small>
+          <strong><span class="lumi">Lumi</span><span class="talk">Talk</span></strong>
         </span>
       </button>
       <div class="header-actions">
         <button class="reward-pill" type="button" data-route="rewards" aria-label="Open rewards">
           <span aria-hidden="true">⭐</span><span id="header-stars">0</span>
         </button>
-        <button class="round-button" type="button" data-action="install" aria-label="Install BrightBridge" hidden>⬇️</button>
-        <button class="round-button" type="button" data-route="settings" aria-label="Open settings">⚙️</button>
+        <button class="parent-header-button" type="button" data-route="parent" aria-label="Open secure Parent Area"><span aria-hidden="true">👤</span> Parent</button>
       </div>
     </header>
 
     <main id="view" class="view" tabindex="-1">
       <section class="loading">
-        <div class="pip-face">😊</div>
-        <h1>Growing your learning garden…</h1>
+        <img class="splash-logo" src="assets/icons/lumitalk-mark.svg" alt="">
+        <h1>LumiTalk</h1><p>Helping Every Child Find Their Voice.</p>
       </section>
     </main>
 
@@ -72,12 +70,12 @@
     <div id="modal-root"></div>
     <div id="toast-root" class="toast-root" aria-live="assertive"></div>
 
-    <script src="js/storage.js?v=10"></script>
+    <script src="js/storage.js?v=39"></script>
     <script src="js/voice-library.js?v=10"></script>
     <script src="js/speech.js?v=10"></script>
     <script src="js/audio.js?v=10"></script>
     <script src="js/rewards.js?v=10"></script>
-    <script src="js/accessibility.js?v=10"></script>
+    <script src="js/accessibility.js?v=39"></script>
     <script src="games/alphabet.js?v=10"></script>
     <script src="games/numbers.js?v=10"></script>
     <script src="games/colors.js?v=10"></script>
@@ -89,10 +87,10 @@
     <script src="games/puzzles.js?v=10"></script>
     <script src="games/dailylife.js?v=10"></script>
     <script src="games/socialskills.js?v=10"></script>
-    <script src="js/mobile-tools.js?v=10"></script>
-    <script src="js/settings.js?v=10"></script>
+    <script src="js/mobile-tools.js?v=39"></script>
+    <script src="js/settings.js?v=39"></script>
     <script src="js/navigation.js?v=10"></script>
-    <script src="js/memory-journey.js?v=13"></script>
-    <script src="js/app.js?v=14"></script>
+    <script src="js/memory-journey.js?v=39"></script>
+    <script src="js/app.js?v=39"></script>
   </body>
 </html>

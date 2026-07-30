@@ -100,7 +100,7 @@
     return `<div class="panel"><h2>Grown-up Mobile Controls</h2>
       <h3>Prompt fading</h3><p>Gradually reduce clues while keeping every response kind and recoverable.</p><div class="category-row">${[["full","Full clues"],["gentle","Gentle clues"],["independent","Independent try"]].map(([value,label])=>`<button class="category-chip ${tools.promptLevel===value?"active":""}" type="button" data-prompt-level="${value}">${label}</button>`).join("")}</div>
       <h3>Guided child mode</h3><p>Keep the phone inside one selected activity. The parent PIN is required to exit.</p><select class="mobile-input" data-guided-route><option value="communication">Communication</option><option value="learning">Learning</option><option value="sensory">Sensory Play</option><option value="music">Music</option><option value="emotions">Feelings</option><option value="daily">Daily Living</option></select><button class="primary-button" type="button" data-mobile-action="start-guided">Start guided mode</button>
-      <h3 style="margin-top:22px">Complete private backup</h3><p>Save profiles, settings, progress, family voices, and personal photo cards into one backup file.</p><div class="mobile-action-row"><button class="secondary-button" type="button" data-mobile-action="export-backup">Download backup</button><label class="secondary-button">Restore backup<input class="sr-only" type="file" accept=".json,.brightbridge,application/json" data-backup-file></label></div>
+      <h3 style="margin-top:22px">Complete private backup</h3><p>Save profiles, settings, progress, family voices, and personal photo cards into one backup file.</p><div class="mobile-action-row"><button class="secondary-button" type="button" data-mobile-action="export-backup">Download backup</button><label class="secondary-button">Restore backup<input class="sr-only" type="file" accept=".json,.lumitalk,.brightbridge,application/json" data-backup-file></label></div>
     </div>`;
   }
 
@@ -191,14 +191,14 @@
   async function exportBackup() {
     if(!requireParentPin()){BB.app.toast("That PIN did not match.");return;}
     BB.app.toast("Preparing the private backup…");
-    const backup={format:"BrightBridge Complete Backup",version:2,createdAt:new Date().toISOString(),state:BB.store.data,voices:await BB.voiceLibrary.exportAll(),photos:await exportPhotos(),memories:await BB.memoryJourney.exportAll()};
-    const blob=new Blob([JSON.stringify(backup)],{type:"application/json"});const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download=`brightbridge-complete-${new Date().toISOString().slice(0,10)}.brightbridge.json`;link.click();URL.revokeObjectURL(link.href);
+    const backup={format:"LumiTalk Complete Backup",version:2,createdAt:new Date().toISOString(),state:BB.store.data,voices:await BB.voiceLibrary.exportAll(),photos:await exportPhotos(),memories:await BB.memoryJourney.exportAll()};
+    const blob=new Blob([JSON.stringify(backup)],{type:"application/json"});const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download=`lumitalk-complete-${new Date().toISOString().slice(0,10)}.lumitalk.json`;link.click();URL.revokeObjectURL(link.href);
   }
 
   async function restoreBackup(file) {
     if(!requireParentPin()){BB.app.toast("That PIN did not match.");return;}
     try {
-      const backup=JSON.parse(await file.text());if(backup.format!=="BrightBridge Complete Backup")throw new Error("Invalid backup");
+      const backup=JSON.parse(await file.text());if(!["LumiTalk Complete Backup","BrightBridge Complete Backup"].includes(backup.format))throw new Error("Invalid backup");
       BB.store.reset();Object.keys(BB.store.data).forEach(key=>delete BB.store.data[key]);Object.assign(BB.store.data,backup.state);BB.store.save();
       await BB.voiceLibrary.clear();await BB.voiceLibrary.importAll(backup.voices);await importPhotos(backup.photos);await BB.memoryJourney.clear();await BB.memoryJourney.importAll(backup.memories);location.reload();
     } catch { BB.app.toast("That backup file could not be restored."); }

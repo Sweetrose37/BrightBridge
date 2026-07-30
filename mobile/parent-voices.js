@@ -53,7 +53,7 @@
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
-        reject(new Error("Private voice storage is taking too long. Close other BrightBridge tabs, reopen the app, and try again."));
+        reject(new Error("Private voice storage is taking too long. Close other LumiTalk tabs, reopen the app, and try again."));
       }, 7000);
       request.onupgradeneeded = () => {
         const db = request.result;
@@ -77,7 +77,7 @@
       request.onblocked = () => {
         if (settled) return;
         settled = true;clearTimeout(timer);
-        reject(new Error("Close other BrightBridge tabs, reopen the app, and try saving the voice again."));
+        reject(new Error("Close other LumiTalk tabs, reopen the app, and try saving the voice again."));
       };
     }).catch(error => {
       databasePromise = null;

@@ -1,4 +1,4 @@
-# BrightBridge Approved Video Library
+# LumiTalk Approved Video Library
 
 The mobile video library is curated. It does not contain open search, comments,
 channel browsing, live chat, playlists, or automatic next-video behavior.

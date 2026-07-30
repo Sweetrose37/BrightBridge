@@ -400,7 +400,7 @@
     const child = options.childName || profileName(report.childProfileId);
     const period = options.period || report.reportDate;
     const lines = [
-      "BRIGHTBRIDGE CHILD DAILY COMMUNICATION REPORT", "",
+      "LUMITALK", "CHILD COMMUNICATION & LEARNING REPORT", "",
       `Child: ${child}`,
       `Report Date: ${report.reportDate}`,
       `Report Period: ${period}`,

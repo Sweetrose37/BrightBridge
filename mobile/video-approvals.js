@@ -1,5 +1,5 @@
 /*
- * BrightBridge Parent Video Approval data layer
+ * LumiTalk Parent Video Approval data layer
  * Local-only storage with role capabilities and immutable audit entries.
  * Development demo records are seeded ONLY on localhost with
  * ?videoApprovalDemo=1 and are never seeded on production.

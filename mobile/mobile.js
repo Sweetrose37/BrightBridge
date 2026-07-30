@@ -109,7 +109,7 @@
     const stage=stages.find(item=>item.id===path.stage)||stages[0];
     return shell("Private Memory Home",`A private, caregiver-controlled story for ${profile().name}.`,`
       ${isBirthday(profile().birthDate)?`<button class="mobile-birthday-banner" type="button" data-mobile-memory-open="celebrate">🎉 Happy Birthday, ${esc(profile().name)}! Your celebration is ready.</button>`:""}
-      <div class="mobile-panel"><h3>🔒 Private by default</h3><p>Recordings, letters, and milestones remain on this device. BrightBridge never translates, decodes, diagnoses, or infers meaning from vocalizations.</p></div>
+      <div class="mobile-panel"><h3>🔒 Private by default</h3><p>Recordings, letters, and milestones remain on this device. LumiTalk never translates, decodes, diagnoses, or infers meaning from vocalizations.</p></div>
       <div class="mobile-memory-grid">
         <button class="mobile-memory-button" type="button" data-mobile-memory-open="voice"><span>🎤</span>Voice Journey<small>${voiceItems.length} recordings</small></button>
         <button class="mobile-memory-button" type="button" data-mobile-memory-open="timeline"><span>🌈</span>Growth Timeline<small>${state().events.length} moments</small></button>
@@ -162,7 +162,7 @@
     return shell("Look How Far I’ve Come™","Celebrate only this child's own progress.",`
       <div class="mobile-stats"><div class="mobile-stat"><strong>⭐ ${BB.store.data.stars}</strong><span>Stars</span></div><div class="mobile-stat"><strong>🌻 ${BB.store.data.flowers}</strong><span>Flowers</span></div><div class="mobile-stat"><strong>🎤 ${voiceItems.length}</strong><span>Voice memories</span></div><div class="mobile-stat"><strong>💌 ${letterItems.length}</strong><span>Letters</span></div></div>
       <div class="mobile-button-row" style="margin:13px 0"><button class="mobile-button secondary" type="button" data-memory-print="timeline">Save timeline PDF</button><button class="mobile-button" type="button" data-memory-slideshow>Journey Through Time</button></div>
-      <div class="mobile-list">${items.length?items.map(item=>`<article class="mobile-list-card"><span>${item.icon||"✨"}</span><div><strong>${esc(item.title)}</strong><small>${formatDate(item.date)} · ${esc(item.detail||"Meaningful progress")}</small></div></article>`).join(""):`<div class="mobile-panel"><h3>This journey is ready to grow</h3><p>Personal milestones will appear as BrightBridge is used.</p></div>`}</div>`);
+      <div class="mobile-list">${items.length?items.map(item=>`<article class="mobile-list-card"><span>${item.icon||"✨"}</span><div><strong>${esc(item.title)}</strong><small>${formatDate(item.date)} · ${esc(item.detail||"Meaningful progress")}</small></div></article>`).join(""):`<div class="mobile-panel"><h3>This journey is ready to grow</h3><p>Personal milestones will appear as LumiTalk is used.</p></div>`}</div>`);
   }
   async function renderLetters(){
     const letterItems=await letters(),voiceItems=await voices();
@@ -177,7 +177,7 @@
   }
   function renderGrowth(){
     const path=growth();
-    return shell("BrightBridge Growth Paths™","Caregiver-controlled stages that never erase history.",`
+    return shell("LumiTalk Growth Paths™","Caregiver-controlled stages that never erase history.",`
       <div class="mobile-panel"><h3>Caregiver promise</h3><p>Changing a stage updates age-appropriate presentation and vocabulary. Voice memories, letters, rewards, achievements, and communication history remain preserved.</p></div>
       <div class="mobile-setting-group"><h3>Progression controls</h3><label class="mobile-setting-row"><span><strong>Child birthday</strong><small>Private and caregiver-controlled</small></span><input type="date" data-mg-birthday value="${esc(profile().birthDate||"")}"></label>${[["automatic","Automatic age suggestion"],["locked","Lock current stage"],["matureContent","Caregiver-approved mature content"]].map(([key,label])=>`<div class="mobile-setting-row"><span><strong>${label}</strong></span><button class="mobile-switch ${path[key]?"on":""}" type="button" data-mg-toggle="${key}"><i></i></button></div>`).join("")}</div>
       <div class="mobile-list">${stages.map((stage,index)=>`<article class="mobile-panel" style="${path.stage===stage.id?"border:3px solid var(--purple)":""}"><div style="font-size:44px">${stage.icon}</div><p class="muted">Stage ${index+1} · ${stage.ages}</p><h2>${stage.name}</h2><p>${stage.focus}</p><div class="mobile-button-row"><button class="mobile-button ${path.stage===stage.id?"secondary":""}" type="button" data-mg-stage="${stage.id}">${path.stage===stage.id?"Current stage":"Choose stage"}</button><button class="mobile-button secondary" type="button" data-mg-preview="${stage.id}">Preview</button></div></article>`).join("")}</div>
@@ -225,7 +225,7 @@
   }
   function homeBanner(){
     const stage=stages.find(item=>item.id===growth().stage)||stages[0];
-    return `<div class="mobile-panel" style="display:flex;align-items:center;gap:12px;margin-top:13px"><span style="font-size:40px">${stage.icon}</span><div><small class="muted">My BrightBridge Growth Path</small><h3 style="margin:2px 0">${stage.name}</h3><p>${stage.focus}</p></div></div>`;
+    return `<button class="mobile-panel mobile-growth-home-card" type="button" data-mobile-memory-open="growth" aria-label="Open My LumiTalk Growth Path: ${esc(stage.name)}"><span style="font-size:40px">${stage.icon}</span><div><small class="muted">My LumiTalk Growth Path</small><h3 style="margin:2px 0">${stage.name}</h3><p>${stage.focus}</p></div></button>`;
   }
   async function clear(){
     state().events=[];state().mobileLetters=[];BB.store.save();
@@ -242,7 +242,7 @@
   async function printSummary(kind,id=null){
     if(id){
       const item=await voiceStore("readonly",store=>store.get(id));if(!item)return;
-      printHtml(item.title,`<h1>🎤 ${esc(item.title)}</h1><p>${formatDate(item.dateTime)} · Age ${esc(item.age||"not added")} · ${Math.round(item.duration||0)} seconds</p><p>${esc(item.notes||"")}</p><p>${(item.tags||[]).map(tag=>`<span class="tag">${esc(tag)}</span>`).join("")}</p>${item.milestone?`<p><strong>Caregiver-defined milestone:</strong> ${esc(item.milestoneLabel||"Personal Achievement")}</p>`:""}<p><em>This is a caregiver-authored memory. BrightBridge does not interpret vocalizations.</em></p>`);return;
+      printHtml(item.title,`<h1>🎤 ${esc(item.title)}</h1><p>${formatDate(item.dateTime)} · Age ${esc(item.age||"not added")} · ${Math.round(item.duration||0)} seconds</p><p>${esc(item.notes||"")}</p><p>${(item.tags||[]).map(tag=>`<span class="tag">${esc(tag)}</span>`).join("")}</p>${item.milestone?`<p><strong>Caregiver-defined milestone:</strong> ${esc(item.milestoneLabel||"Personal Achievement")}</p>`:""}<p><em>This is a caregiver-authored memory. LumiTalk does not interpret vocalizations.</em></p>`);return;
     }
     if(kind==="voice"){const items=await filteredVoices();printHtml("Voice Journey Timeline",`<h1>${esc(profile().name)} — Voice Journey™</h1><p>Caregiver-authored memories. No vocalizations were translated, interpreted, or diagnosed.</p>${items.map(item=>`<article><h2>${item.milestone?"⭐ ":""}${esc(item.title)}</h2><p>${formatDate(item.dateTime)} · Age ${esc(item.age||"not added")}</p><p>${esc(item.notes||"")}</p></article>`).join("")||"<p>No recordings yet.</p>"}`);return;}
     const items=computedTimeline();printHtml("Look How Far I’ve Come",`<h1>${esc(profile().name)} — Look How Far I’ve Come™</h1><p>This timeline celebrates only this child’s own journey.</p>${items.slice().reverse().map(item=>`<article><h2>${item.icon||"✨"} ${esc(item.title)}</h2><p>${formatDate(item.date)} · ${esc(item.detail||"")}</p></article>`).join("")}`);
@@ -282,7 +282,7 @@
     const canvas=document.createElement("canvas");canvas.width=1080;canvas.height=1350;const ctx=canvas.getContext("2d");ctx.fillStyle="#f7f1ff";ctx.fillRect(0,0,1080,1350);ctx.fillStyle="#7055b8";ctx.textAlign="center";ctx.font="bold 58px system-ui";ctx.fillText(lines[0],540,170);ctx.fillStyle="#24324a";ctx.font="36px system-ui";lines.slice(1).forEach((line,index)=>ctx.fillText(line,540,300+index*125));canvas.toBlob(blob=>downloadBlob(blob,`happy-birthday-${profile().name.replace(/[^a-z0-9]+/gi,"-")}.png`),"image/png");
   }
   async function keepsakeBook(){
-    const items=await letters();printHtml(`${profile().name} Keepsake Book`,`<div style="text-align:center;padding:60px 10px"><h1>💌 🌸 🎤</h1><h1>${esc(profile().name)}’s BrightBridge Keepsake Book</h1><p>Letters, memories, growth, and encouragement</p></div><h1>Letters</h1>${items.slice().reverse().map(item=>`<article><h2>💌 ${esc(item.title)}</h2><p>From ${esc(item.author||"Caregiver")} · ${formatDate(item.date)}</p>${sanitizeRichHtml(item.body||"")}</article>`).join("")||"<p>No letters yet.</p>"}`);
+    const items=await letters();printHtml(`${profile().name} Keepsake Book`,`<div style="text-align:center;padding:60px 10px"><h1>💌 🌸 🎤</h1><h1>${esc(profile().name)}’s LumiTalk Keepsake Book</h1><p>Letters, memories, growth, and encouragement</p></div><h1>Letters</h1>${items.slice().reverse().map(item=>`<article><h2>💌 ${esc(item.title)}</h2><p>From ${esc(item.author||"Caregiver")} · ${formatDate(item.date)}</p>${sanitizeRichHtml(item.body||"")}</article>`).join("")||"<p>No letters yet.</p>"}`);
   }
 
   function voiceMetadata(){
@@ -395,6 +395,7 @@
     reducedMotion:["Reduce motion","Keep transitions still"],
     simpleMode:["Simple mode","Show fewer choices"],
     colorFriendly:["Color-friendly palette","Use patterns and stronger shape cues"],
+    showEncouragementHelper:["Show Encouragement Helper","Display the small encouragement strip below activities"],
     offlineMode:["Offline mode","Keep core activities ready without internet"],
     notifications:["Notifications","Optional caregiver-approved reminders"]
   };
@@ -603,7 +604,7 @@
         stopVideoUsage();
         try{youtubePlayer?.stopVideo?.();}catch{}
         const target=document.querySelector("[data-video-player-wrap]");
-        if(target)target.innerHTML='<div class="mobile-video-error" role="status"><span>🌙</span><h3>Video time is finished for today.</h3><p>You can choose another BrightBridge activity.</p></div>';
+        if(target)target.innerHTML='<div class="mobile-video-error" role="status"><span>🌙</span><h3>Video time is finished for today.</h3><p>You can choose another LumiTalk activity.</p></div>';
       }
     },1000);
   }
@@ -642,7 +643,7 @@
   function openVideoPlayer(video,preview=false){
     if(!video?.youtubeId)return;
     if(!preview&&videoLimitReached(video)){
-      modal(`<div class="mobile-modal-head"><h2>Video time</h2><button class="mobile-close" type="button" data-action="close-video" aria-label="Close">×</button></div><div class="mobile-video-error"><span>🌙</span><h3>Video time is finished for today.</h3><p>You can choose another BrightBridge activity.</p></div><button class="mobile-button mobile-wide-button" type="button" data-action="close-video">Close</button>`,"Video time");
+      modal(`<div class="mobile-modal-head"><h2>Video time</h2><button class="mobile-close" type="button" data-action="close-video" aria-label="Close">×</button></div><div class="mobile-video-error"><span>🌙</span><h3>Video time is finished for today.</h3><p>You can choose another LumiTalk activity.</p></div><button class="mobile-button mobile-wide-button" type="button" data-action="close-video">Close</button>`,"Video time");
       return;
     }
     destroyVideoPlayer();
@@ -714,7 +715,7 @@
         <div class="mobile-button-row"><button class="mobile-button secondary" type="button" data-action="video-form-preview">Preview</button><button class="mobile-button" type="button" data-action="video-save">${editing?"Save changes":"Add approved video"}</button></div>
         ${editing?'<button class="mobile-button secondary mobile-wide-button" type="button" data-action="video-cancel-edit">Cancel editing</button>':""}
       </div>
-      <div class="mobile-video-manager-note"><strong>Important</strong><p>BrightBridge cannot automatically judge a video's content or detect every live, age, regional, or embedding restriction. The approving adult must review the complete video.</p></div>
+      <div class="mobile-video-manager-note"><strong>Important</strong><p>LumiTalk cannot automatically judge a video's content or detect every live, age, regional, or embedding restriction. The approving adult must review the complete video.</p></div>
       <div class="mobile-section-title"><h2>Saved approved list</h2><small>${approvedVideos.length} entries</small></div>
       <div class="mobile-video-grid">${approvedVideos.map(video=>renderVideoCard(video,true)).join("")||'<div class="mobile-video-empty"><p>No saved videos.</p></div>'}</div>
     </section>`;
@@ -771,7 +772,7 @@
 
   function sendVideoNotification(message){
     if(BB.store.data.settings.notifications&&window.Notification?.permission==="granted"){
-      try{new Notification("BrightBridge",{body:message,tag:"brightbridge-video-approval"});}catch{}
+      try{new Notification("LumiTalk",{body:message,tag:"brightbridge-video-approval"});}catch{}
     }
   }
 
@@ -1006,7 +1007,7 @@
       request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains("cards"))db.createObjectStore("cards",{keyPath:"id"});};
       request.onsuccess=()=>{clearTimeout(timer);resolve(request.result);};
       request.onerror=()=>{clearTimeout(timer);reject(request.error);};
-      request.onblocked=()=>{clearTimeout(timer);reject(new Error("Close another BrightBridge tab and try again."));};
+      request.onblocked=()=>{clearTimeout(timer);reject(new Error("Close another LumiTalk tab and try again."));};
     }).catch(error=>{customDbPromise=null;throw error;});
     return customDbPromise;
   }
@@ -1262,17 +1263,17 @@
   function renderHome(){
     const profile=activeProfile();
     const cards=[
-      ["communication","💬","Communication","Words, cards, and family voices","#ffe5df"],
-      ["learning","📚","Learning","Flashcards and gentle challenges","#ece5ff"],
-      ["calm","☁️","Feelings & Calm","Breathe, name feelings, and sensory play","#dff4ff"],
-      ["daily","🚪","Daily Living","Practice familiar routines","#e5f2ff"],
-      ["music","🎹","Music","Play notes and discover sounds","#fff0c9"],
-      ["nature","🦋","Nature","Explore animals, gardens, oceans, and space","#ddf5ed"],
-      ["videos","📺","Approved Videos","Only videos chosen by a grown-up","#fce2f0"],
-      ["talkRead","🗣️","Learn to Talk & Read","Speech practice and interactive stories","#e8f7ef"]
+      ["communication","💬","Communication","Words, cards, and family voices","var(--pale-blue)"],
+      ["learning","📚","Learning","Flashcards and gentle challenges","var(--soft-mint)"],
+      ["calm","☁️","Feelings & Calm","Feelings, breathing, and sensory play","var(--pale-blue)"],
+      ["daily","🚪","Daily Living","Practice familiar routines","var(--surface-soft)"],
+      ["music","🎹","Music","Play notes and discover sounds","#FFF5CC"],
+      ["nature","🦋","Nature","Animals, gardens, oceans, and space","var(--soft-mint)"],
+      ["videos","📺","Approved Videos","Only grown-up-approved videos","var(--surface-soft)"],
+      ["talkRead","🗣️","Learn to Talk & Read","Speech practice and interactive stories","var(--pale-blue)"]
     ];
     return `<section>
-      <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
+      <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face" role="img" aria-label="Friendly smile">😊</div></div><p>Choose what feels good today. You can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
@@ -1688,7 +1689,7 @@
       <div class="mobile-report-export-bar"><button class="mobile-button" type="button" data-report-export="print" data-report-scope="range">Print / Save PDF</button><button class="mobile-button secondary" type="button" data-report-export="csv" data-report-scope="range">Readable CSV</button><button class="mobile-button secondary" type="button" data-report-export="text" data-report-scope="range">Plain text</button><button class="mobile-button secondary" type="button" data-report-export="print" data-report-scope="all">All history PDF</button></div>
       ${summary?`<div class="mobile-panel"><h2>${reportView==="week"?"Last 7 days":"This month"}</h2><div class="mobile-report-totals"><div><strong>${summaryReports.length}</strong><span>Days</span></div><div><strong>${summary.totalCardTaps}</strong><span>Card selections</span></div><div><strong>${Math.round(summary.totalSessionSeconds/60)}m</strong><span>App time</span></div><div><strong>⭐ ${summary.starsEarned||0}</strong><span>Stars collected</span></div></div><p>${esc(BB.dailyReports.plainSummary(summary))}</p></div>`:""}
       <div class="mobile-report-history">${reports.map(renderDailyReportCard).join("")||'<div class="mobile-panel"><h2>No reports match</h2><p>No activity was recorded for the selected child and date range.</p></div>'}</div>
-      <details class="mobile-panel"><summary>Advanced technical support</summary><p>This backup contains technical app data and is not the normal parent report.</p><button class="mobile-button secondary" type="button" data-action="export-raw">Export Raw Data for Technical Support</button></details>
+      <details class="mobile-panel"><summary>Private support backup</summary><p>This parent-only backup preserves app data for troubleshooting. Use Daily Reports for readable progress information.</p><button class="mobile-button secondary" type="button" data-action="export-raw">Download private support backup</button></details>
     </section>`;
   }
 
@@ -1703,8 +1704,7 @@
       ["rewards","🌻","Reward Garden","Celebrate effort","#fff0bd"],
       ["progress","📈","My Progress","Personal growth only","#ddf5ed"],
       ["tools","🧰","My Tools","Schedules, choices, photos, and guided mode","#e5f2ff"],
-      ["settings","⚙️","Comfort Settings","Sound, text, and motion","#e9efff"],
-      ["install","📲","Install BrightBridge","Keep the app on this device","#fff0c9"],
+      ["install","📲","Install LumiTalk","Keep the app on this device","#fff0c9"],
       ["parent","🔒","Grown-up Area","Private caregiver controls","#ececf2"]
     ];
     return `<section>${pageHead("More to Explore","Activities and caregiver tools.")}
@@ -1736,11 +1736,12 @@
         </details>
       </div>
       <div class="mobile-profile-actions"><button class="mobile-button secondary" type="button" data-action="add-profile"><span>➕</span><strong>Add another profile</strong><small>Create a separate private journey</small></button><button class="mobile-button secondary" type="button" data-route="quickTalkVoices"><span>🎙️</span><strong>Parent Card Voices</strong><small>Quick Talk, Feelings, and Calm & Sensory</small></button><button class="mobile-button secondary" type="button" data-route="parentVoiceLibrary"><span>🎧</span><strong>Parent Voice Library</strong><small>Search, filter, and manage private card voices</small></button><button class="mobile-button secondary" type="button" data-route="communication"><span>💬</span><strong>All Communication Cards</strong><small>Manage custom cards and existing family voices</small></button></div>
-      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button" type="button" data-route="dailyReports">📊 Daily Reports</button><button class="mobile-button secondary" type="button" data-route="talkReadParent">🗣️ Learn to Talk & Read Settings</button><button class="mobile-button secondary" type="button" data-route="videoApprovals">📨 Video Approval Requests</button><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
+      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button" type="button" data-route="dailyReports">📊 Daily Reports</button><button class="mobile-button secondary" type="button" data-route="talkReadParent">🗣️ Learn to Talk & Read Settings</button><button class="mobile-button secondary" type="button" data-route="videoApprovals">📨 Video Approval Requests</button><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-route="settings">⚙️ Sound & Accessibility Settings</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset LumiTalk</button></div>
     </section>`;
   }
 
   function renderSettings(){
+    if(!parentUnlocked)return renderParent();
     const settings=BB.store.data.settings;
     return `<section>${pageHead("Comfort Settings","Make the mobile experience feel right.","more")}
       <div class="mobile-setting-group"><h3>Sound & appearance</h3>${Object.entries(settingsRows).map(([key,[title,detail]])=>`<div class="mobile-setting-row"><span><strong>${title}</strong><small>${detail}</small></span><button class="mobile-switch ${settings[key]?"on":""}" type="button" role="switch" aria-checked="${settings[key]}" data-setting="${key}"><i></i></button></div>`).join("")}
@@ -1749,7 +1750,7 @@
         <label class="mobile-setting-row mobile-range-row"><span><strong>Caregiver voice speed</strong><small>Used when supported by recorded audio playback</small></span><input type="range" min=".6" max="1.25" step=".05" value="${settings.speechRate}" data-range="speechRate"></label>
         <label class="mobile-setting-row mobile-range-row"><span><strong>Music volume</strong></span><input type="range" min="0" max="1" step=".05" value="${settings.musicVolume}" data-range="musicVolume"></label>
         <label class="mobile-setting-row mobile-range-row"><span><strong>Animation speed</strong></span><input type="range" min=".5" max="1.5" step=".1" value="${settings.animationSpeed}" data-range="animationSpeed"></label>
-      </div><div class="mobile-setting-group mobile-learning-preferences"><h3>Learning preferences</h3><label class="mobile-setting-row"><span><strong>Language</strong></span><select data-setting-select="language"><option value="en-US" ${settings.language==="en-US"?"selected":""}>English (US)</option><option value="en-GB" ${settings.language==="en-GB"?"selected":""}>English (UK)</option><option value="es-US" ${settings.language==="es-US"?"selected":""}>Español</option></select></label><label class="mobile-setting-row"><span><strong>Difficulty</strong></span><select data-setting-select="difficulty"><option value="starter" ${settings.difficulty==="starter"?"selected":""}>Starter</option><option value="growing" ${settings.difficulty==="growing"?"selected":""}>Growing</option><option value="independent" ${settings.difficulty==="independent"?"selected":""}>Independent</option></select></label></div><button class="mobile-button mobile-wide-button" type="button" data-action="install">Install BrightBridge</button><p class="muted">🔒 Activity stays on this device. No ads and no tracking.</p>
+      </div><div class="mobile-setting-group mobile-learning-preferences"><h3>Learning preferences</h3><label class="mobile-setting-row"><span><strong>Language</strong></span><select data-setting-select="language"><option value="en-US" ${settings.language==="en-US"?"selected":""}>English (US)</option><option value="en-GB" ${settings.language==="en-GB"?"selected":""}>English (UK)</option><option value="es-US" ${settings.language==="es-US"?"selected":""}>Español</option></select></label><label class="mobile-setting-row"><span><strong>Difficulty</strong></span><select data-setting-select="difficulty"><option value="starter" ${settings.difficulty==="starter"?"selected":""}>Starter</option><option value="growing" ${settings.difficulty==="growing"?"selected":""}>Growing</option><option value="independent" ${settings.difficulty==="independent"?"selected":""}>Independent</option></select></label></div><div class="mobile-panel"><h3>About LumiTalk</h3><p>LumiTalk supports communication and learning without replacing speech-language, educational, therapeutic, or medical services.</p><p class="muted">App Version: 1.0.0</p></div><button class="mobile-button mobile-wide-button" type="button" data-action="install">Install LumiTalk</button><p class="muted">🔒 Activity stays on this device. No ads and no tracking.</p>
     </section>`;
   }
 
@@ -1911,7 +1912,7 @@
     stage.addEventListener("pointerup",()=>drawing=false);stage.addEventListener("pointercancel",()=>drawing=false);
   }
   function setupTracing(){
-    const canvas=document.querySelector("[data-trace-canvas]");if(!canvas)return;const context=canvas.getContext("2d");context.lineCap="round";context.lineJoin="round";context.lineWidth=18;context.strokeStyle="#7055b8";let drawing=false;
+    const canvas=document.querySelector("[data-trace-canvas]");if(!canvas)return;const context=canvas.getContext("2d");context.lineCap="round";context.lineJoin="round";context.lineWidth=18;context.strokeStyle="#4A90E2";let drawing=false;
     const point=event=>{const rect=canvas.getBoundingClientRect();return {x:(event.clientX-rect.left)*canvas.width/rect.width,y:(event.clientY-rect.top)*canvas.height/rect.height};};
     canvas.addEventListener("pointerdown",event=>{drawing=true;const value=point(event);context.beginPath();context.moveTo(value.x,value.y);canvas.setPointerCapture?.(event.pointerId);});
     canvas.addEventListener("pointermove",event=>{if(!drawing)return;const value=point(event);context.lineTo(value.x,value.y);context.stroke();});
@@ -1929,7 +1930,7 @@
 
   function exportRawSupport(){
     const link=document.createElement("a"),blob=new Blob([BB.store.exportData()],{type:"application/json"});
-    link.href=URL.createObjectURL(blob);link.download=`brightbridge-technical-support-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),500);
+    link.href=URL.createObjectURL(blob);link.download=`lumitalk-technical-support-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),500);
   }
 
   function reportsForExport(button){
@@ -1951,7 +1952,7 @@
       });
       return `<article>${html}</article>`;
     }).join("");
-    return `<!doctype html><html><head><meta charset="utf-8"><title>BrightBridge Daily Report</title><style>body{margin:0;background:#fff;color:#1f3048;font:15px/1.45 Arial,sans-serif}main{max-width:780px;margin:auto;padding:32px}article{page-break-after:always}article:last-child{page-break-after:auto}h1{font-size:24px;border-bottom:3px solid #7055b8;padding-bottom:10px}h2{margin-top:22px;padding:7px 10px;background:#eee9fb;font-size:17px}p{margin:4px 0;white-space:pre-wrap}.space{height:9px}.brand{color:#7055b8;font-weight:bold}@media print{main{max-width:none;padding:12mm}h1,h2{break-after:avoid}p{orphans:3;widows:3}}@page{margin:14mm}</style></head><body><main><div class="brand">BrightBridge</div>${content}</main><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),150));<\/script></body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><title>LumiTalk Child Communication & Learning Report</title><style>body{margin:0;background:#fff;color:#2E3A46;font:15px/1.45 Arial,sans-serif}main{max-width:780px;margin:auto;padding:32px}article{page-break-after:always}article:last-child{page-break-after:auto}h1{font-size:24px;border-bottom:3px solid #4A90E2;padding-bottom:10px}h2{margin-top:22px;padding:7px 10px;background:#EAF4FD;font-size:17px}p{margin:4px 0;white-space:pre-wrap}.space{height:9px}.brand{color:#245B8F;font-weight:bold}@media print{main{max-width:none;padding:12mm}h1,h2{break-after:avoid}p{orphans:3;widows:3}}@page{margin:14mm}</style></head><body><main><div class="brand">LumiTalk<br><small>Child Communication & Learning Report</small></div>${content}</main><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),150));<\/script></body></html>`;
   }
 
   function exportParentReport(button){
@@ -1964,9 +1965,9 @@
         if(!printWindow){toast("The report was created, but it could not be shared. Please try again.");return;}
         printWindow.document.open();printWindow.document.write(printableReportHtml(reports));printWindow.document.close();return;
       }
-      if(type==="csv"){downloadFile(new Blob([BB.dailyReports.csv(reports)],{type:"text/csv;charset=utf-8"}),`brightbridge-${name}-${period}.csv`);return;}
+      if(type==="csv"){downloadFile(new Blob([BB.dailyReports.csv(reports)],{type:"text/csv;charset=utf-8"}),`lumitalk-${name}-${period}.csv`);return;}
       const text=reports.map(report=>BB.dailyReports.formatText(report,{childName:BB.dailyReports.profileName(report.childProfileId)})).join("\n\n\f\n\n");
-      downloadFile(new Blob([text],{type:"text/plain;charset=utf-8"}),`brightbridge-${name}-${period}.txt`);
+      downloadFile(new Blob([text],{type:"text/plain;charset=utf-8"}),`lumitalk-${name}-${period}.txt`);
     }catch{
       toast("We could not create the report right now. Your child’s saved information has not been deleted.");
     }
@@ -2128,12 +2129,12 @@
       case "change-pin":modal(`<div class="mobile-modal-head"><h2>Change parent PIN</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><input class="pin-entry" type="password" inputmode="numeric" maxlength="4" data-new-pin placeholder="New 4-digit PIN"><button class="mobile-button pin-continue" type="button" data-action="save-pin">Save PIN</button>`,"Change PIN");break;
       case "save-pin":{const value=document.querySelector("[data-new-pin]")?.value;if(/^\d{4}$/.test(value)){BB.store.data.settings.parentPin=value;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers.");break;}
       case "lock-parent":BB.videoApprovals.closeParent(parentVideoActor);BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;parentUnlocked=false;toast("Grown-up Area locked");go("more",{replace:true});break;
-      case "install":if(installPrompt){installPrompt.prompt();installPrompt.userChoice.finally(()=>installPrompt=null);}else modal(`<div class="mobile-modal-head"><h2>Install BrightBridge</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Open your browser menu and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.</p><button class="mobile-button" type="button" data-action="close-modal">Got it</button>`,"Install BrightBridge");break;
+      case "install":if(installPrompt){installPrompt.prompt();installPrompt.userChoice.finally(()=>installPrompt=null);}else modal(`<div class="mobile-modal-head"><h2>Install LumiTalk</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Open your browser menu and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.</p><button class="mobile-button" type="button" data-action="close-modal">Got it</button>`,"Install LumiTalk");break;
       case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();reportProfile=profile.id;BB.dailyReports.startSession(profile.id);BB.weeklyRewards.ensure(profile.id);BB.talkRead?.refreshProfile?.();go("parent",{replace:true});break;}
       case "delete-profile":{if(BB.store.data.profiles.length<2)break;if(confirm(`Delete ${activeProfile().name}'s profile? Private recordings must be deleted separately.`)){BB.store.data.profiles=BB.store.data.profiles.filter(item=>item.id!==BB.store.data.activeProfile);BB.store.data.activeProfile=BB.store.data.profiles[0].id;BB.store.save();go("parent",{replace:true});}break;}
       case "export":go("dailyReports");break;
       case "export-raw":if(parentUnlocked)exportRawSupport();break;
-      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),parentVoiceActor?BB.parentVoices.clear(parentVoiceActor):Promise.resolve(),BB.memoryJourney.clear(),clearCustomCards(),BB.talkReadStorage?.clearAll?.()||Promise.resolve()]).finally(()=>{if(parentVideoActor)BB.videoApprovals.clear(parentVideoActor);clearApprovedVideos();BB.store.reset();BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;caregiverActor=null;parentUnlocked=false;go("home");});break;
+      case "reset":if(confirm("Reset all LumiTalk progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),parentVoiceActor?BB.parentVoices.clear(parentVoiceActor):Promise.resolve(),BB.memoryJourney.clear(),clearCustomCards(),BB.talkReadStorage?.clearAll?.()||Promise.resolve()]).finally(()=>{if(parentVideoActor)BB.videoApprovals.clear(parentVideoActor);clearApprovedVideos();BB.store.reset();BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;caregiverActor=null;parentUnlocked=false;go("home");});break;
       case "close-modal":closeModal();break;
       case "modal-overlay":if(event.target===action)closeModal();break;
     }

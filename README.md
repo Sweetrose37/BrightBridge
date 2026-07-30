@@ -1,8 +1,8 @@
-# BrightBridge™
+# LumiTalk™
 
-**Helping Every Touch Become Communication**
+**Every voice matters. Every word is a step.**
 
-BrightBridge is an offline-first educational and communication Progressive Web
+LumiTalk is an offline-first educational and communication Progressive Web
 App designed with nonverbal autistic children in mind. It uses only HTML, CSS,
 and vanilla JavaScript. There are no advertisements, accounts, analytics,
 external content, or required network services.
@@ -24,7 +24,7 @@ external content, or required network services.
 - Visual daily routines and positive social stories.
 - Stars, flowers, butterflies, stickers, badges, and a growing reward garden.
 - PIN-protected local parent dashboard with progress, screen time, difficulty,
-  profile name, JSON export, and reset.
+  profile name, parent-friendly reports, private backups, and reset.
 - PIN-protected **Voice Journey™** with private local audio recording,
   caregiver-entered titles, dates, ages, notes, tags, favorites, milestones,
   search, comparison, and audio/PDF/ZIP export.
@@ -33,7 +33,7 @@ external content, or required network services.
 - **Letters to My Future Self™** with rich text, photos, linked voice memories,
   achievements, Reward Garden snapshots, future-reading choices, PDF output,
   and a printable keepsake book.
-- **BrightBridge Growth Paths™** with four caregiver-controlled stages,
+- **LumiTalk Growth Paths™** with four caregiver-controlled stages,
   optional age progression, stage locking, previews, feature controls,
   stage-aware AAC vocabulary, and complete history preservation.
 - Dark mode, high contrast, large text, reduced motion, simple mode,
@@ -87,7 +87,7 @@ screen time are saved in browser `localStorage`. Family voice recordings are
 stored separately in the browser’s local IndexedDB because audio files are too
 large for settings storage. Personal photo cards use a separate local IndexedDB.
 Voice Journey recordings, private letters, and letter photos use their own local
-IndexedDB. BrightBridge does not translate, decode, interpret, diagnose, or
+IndexedDB. LumiTalk does not translate, decode, interpret, diagnose, or
 infer thoughts or emotions from a child’s vocalizations; all Voice Journey
 organization comes from information entered by a caregiver.
 The mobile complete-backup tool can package settings, progress, recordings, and

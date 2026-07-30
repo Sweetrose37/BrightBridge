@@ -1,7 +1,7 @@
 # Daily Reports
 
-BrightBridge Mobile stores parent-facing daily reports locally in the existing
-BrightBridge state under `dailyReporting`.
+LumiTalk Mobile stores parent-facing daily reports locally in the existing
+LumiTalk state under `dailyReporting`.
 
 ## Daily rollover
 
