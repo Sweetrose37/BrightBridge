@@ -403,10 +403,16 @@
   let voiceSetup=false;
   let videoCategory="all";
   let editingVideoId="";
+  let editingApprovalRequestId="";
+  let parentVideoActor=null;
+  let caregiverActor=null;
   let approvedVideos=loadApprovedVideos();
   let youtubeApiPromise=null;
   let youtubePlayer=null;
   let youtubeReadyTimer=null;
+  let currentVideoRecord=null;
+  let currentVideoPreview=false;
+  let videoUsageTimer=null;
   let customCards=[];
   let customLoadedProfile="";
   let customPhotoUrls=[];
@@ -458,7 +464,18 @@
       enabled:Boolean(item.enabled),
       sensoryNotes:String(item.sensoryNotes||"").slice(0,240),
       recommendedAge:String(item.recommendedAge||"Caregiver choice").slice(0,50),
-      placeholder:Boolean(item.placeholder)
+      placeholder:Boolean(item.placeholder),
+      requestId:String(item.requestId||""),
+      status:String(item.status||"Approved"),
+      childIds:Array.isArray(item.childIds)&&item.childIds.length?item.childIds.map(String):["all"],
+      parentId:String(item.parentId||""),
+      parentDisplayName:String(item.parentDisplayName||""),
+      approvedAt:String(item.approvedAt||""),
+      removedAt:String(item.removedAt||""),
+      expiresAt:String(item.expiresAt||""),
+      viewingLimitMinutes:Math.max(0,Number(item.viewingLimitMinutes)||0),
+      allowRepeatPlayback:Boolean(item.allowRepeatPlayback),
+      originalRequester:String(item.originalRequester||"")
     };
   }
 
@@ -476,6 +493,7 @@
 
   function clearApprovedVideos(){
     localStorage.removeItem("brightbridge-approved-videos-v1");
+    localStorage.removeItem("brightbridge-video-daily-allowance-v1");
     approvedVideos=(videoData().videos||[]).map(normalizeVideo);
     editingVideoId="";videoCategory="all";
   }
@@ -502,12 +520,49 @@
   }
 
   function enabledVideos(){
-    return approvedVideos.filter(video=>video.enabled&&video.youtubeId&&!video.placeholder);
+    const profileId=activeProfile().id,today=Date.now();
+    return approvedVideos.filter(video=>{
+      const assigned=video.childIds.includes("all")||video.childIds.includes(profileId);
+      const active=!video.expiresAt||new Date(`${video.expiresAt}T23:59:59`).getTime()>=today;
+      return video.status==="Approved"&&video.enabled&&video.youtubeId&&!video.placeholder&&assigned&&active;
+    });
   }
 
   function youtubeEmbedUrl(videoId){
     const origin=location.origin&&location.origin!=="null"?`&origin=${encodeURIComponent(location.origin)}`:"";
     return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&autoplay=0&controls=1&playsinline=1&rel=0&loop=0${origin}`;
+  }
+
+  function videoUsageState(){
+    try{
+      const saved=JSON.parse(localStorage.getItem("brightbridge-video-daily-allowance-v1")||"null");
+      if(saved?.date===new Date().toISOString().slice(0,10)&&saved.seconds)return saved;
+    }catch{}
+    return {date:new Date().toISOString().slice(0,10),seconds:{}};
+  }
+
+  function videoUsageKey(video){return `${activeProfile().id}:${video.id}`;}
+  function videoLimitReached(video){
+    if(!video.viewingLimitMinutes)return false;
+    const usage=videoUsageState();
+    return (usage.seconds[videoUsageKey(video)]||0)>=video.viewingLimitMinutes*60;
+  }
+  function stopVideoUsage(){
+    clearInterval(videoUsageTimer);videoUsageTimer=null;
+  }
+  function startVideoUsage(){
+    if(videoUsageTimer||currentVideoPreview||!currentVideoRecord?.viewingLimitMinutes)return;
+    videoUsageTimer=setInterval(()=>{
+      const usage=videoUsageState(),key=videoUsageKey(currentVideoRecord);
+      usage.seconds[key]=(usage.seconds[key]||0)+1;
+      try{localStorage.setItem("brightbridge-video-daily-allowance-v1",JSON.stringify(usage));}catch{}
+      if(videoLimitReached(currentVideoRecord)){
+        stopVideoUsage();
+        try{youtubePlayer?.stopVideo?.();}catch{}
+        const target=document.querySelector("[data-video-player-wrap]");
+        if(target)target.innerHTML='<div class="mobile-video-error" role="status"><span>🌙</span><h3>Video time is finished for today.</h3><p>You can choose another BrightBridge activity.</p></div>';
+      }
+    },1000);
   }
 
   function ensureYouTubeApi(){
@@ -529,6 +584,7 @@
   }
 
   function destroyVideoPlayer(){
+    stopVideoUsage();
     clearTimeout(youtubeReadyTimer);youtubeReadyTimer=null;
     try{youtubePlayer?.stopVideo?.();youtubePlayer?.destroy?.();}catch{}
     youtubePlayer=null;
@@ -540,9 +596,14 @@
     if(target)target.innerHTML='<div class="mobile-video-error" role="alert"><span>📺</span><h3>This video is not available right now.</h3><p>Please choose another video.</p></div>';
   }
 
-  function openVideoPlayer(video){
+  function openVideoPlayer(video,preview=false){
     if(!video?.youtubeId)return;
+    if(!preview&&videoLimitReached(video)){
+      modal(`<div class="mobile-modal-head"><h2>Video time</h2><button class="mobile-close" type="button" data-action="close-video" aria-label="Close">×</button></div><div class="mobile-video-error"><span>🌙</span><h3>Video time is finished for today.</h3><p>You can choose another BrightBridge activity.</p></div><button class="mobile-button mobile-wide-button" type="button" data-action="close-video">Close</button>`,"Video time");
+      return;
+    }
     destroyVideoPlayer();
+    currentVideoRecord=video;currentVideoPreview=preview;
     modal(`<div class="mobile-modal-head"><h2>${esc(video.title)}</h2><button class="mobile-close" type="button" data-action="close-video" aria-label="Close video">×</button></div>
       ${video.sensoryNotes?`<div class="mobile-sensory-warning" role="note"><strong>⚠️ Sensory note</strong><span>${esc(video.sensoryNotes)}</span></div>`:""}
       <div class="mobile-video-player" data-video-player-wrap>
@@ -556,6 +617,15 @@
       const frame=document.querySelector("#brightbridge-youtube-player");if(!frame)return;
       youtubePlayer=new YT.Player(frame,{events:{
         onReady:()=>{clearTimeout(youtubeReadyTimer);youtubeReadyTimer=null;document.querySelector(".mobile-video-loading")?.remove();},
+        onStateChange:event=>{
+          if(event.data===1)startVideoUsage();
+          if([0,2].includes(event.data))stopVideoUsage();
+          if(event.data===0&&!currentVideoPreview&&!currentVideoRecord?.allowRepeatPlayback){
+            destroyVideoPlayer();
+            const target=document.querySelector("[data-video-player-wrap]");
+            if(target)target.innerHTML='<div class="mobile-video-error" role="status"><span>⭐</span><h3>Video finished.</h3><p>Choose Close Video to return to the approved library.</p></div>';
+          }
+        },
         onError:showVideoUnavailable
       }});
     }).catch(showVideoUnavailable);
@@ -566,7 +636,7 @@
     return `<article class="mobile-video-card ${video.enabled?"":"is-disabled"}">
       <div class="mobile-video-thumb">${thumbnail?`<img src="${thumbnail}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'<span aria-hidden="true">📺</span>'}<div class="mobile-approved-badge">${manage&&!video.enabled?"Not enabled":"✓ Parent approved"}</div></div>
       <div class="mobile-video-copy"><h3>${esc(video.title)}</h3>${video.description?`<p>${esc(video.description)}</p>`:""}<div class="mobile-video-meta"><span>👧 ${esc(video.recommendedAge||"Caregiver choice")}</span>${video.sensoryNotes?'<span class="has-warning">⚠️ Sensory note</span>':""}</div>${video.sensoryNotes?`<div class="mobile-sensory-warning"><strong>⚠️ Sensory note</strong><span>${esc(video.sensoryNotes)}</span></div>`:""}</div>
-      ${manage?`<div class="mobile-video-manage-actions"><button type="button" data-video-preview="${esc(video.id)}" ${video.youtubeId?"":"disabled"}>▶ Preview</button><button type="button" data-video-edit="${esc(video.id)}">✏️ Edit</button><button type="button" data-video-toggle="${esc(video.id)}">${video.enabled?"Disable":"Enable"}</button><button class="danger" type="button" data-video-remove="${esc(video.id)}">Remove</button></div>`:`<button class="mobile-video-play" type="button" data-video-play="${esc(video.id)}" aria-label="Play ${esc(video.title)}">▶ Play</button>`}
+      ${manage?`<div class="mobile-video-manage-actions"><button type="button" data-video-preview="${esc(video.id)}" ${video.youtubeId?"":"disabled"}>▶ Preview</button><button type="button" data-video-edit="${esc(video.id)}">✏️ Edit</button><button type="button" data-video-toggle="${esc(video.id)}">${video.enabled?"Disable":"Enable"}</button><button class="danger" type="button" data-video-remove="${esc(video.id)}">${video.requestId?"Revoke":"Remove"}</button></div>`:`<button class="mobile-video-play" type="button" data-video-play="${esc(video.id)}" aria-label="Play ${esc(video.title)}">▶ Play</button>`}
     </article>`;
   }
 
@@ -646,6 +716,242 @@
     const draft=videoFormDraft();
     if(!draft.youtubeId){toast("Enter a valid YouTube video ID or URL to preview.");return;}
     openVideoPlayer({...draft,title:draft.title||"Video preview"});
+  }
+
+  function requestStatusMeta(status){
+    return {
+      "Draft":["📝","Draft"],"Pending Parent Approval":["⏳","Pending Parent Approval"],Approved:["✅","Approved"],
+      Rejected:["❌","Rejected"],"Changes Requested":["✏️","Changes Requested"],Expired:["⌛","Expired"],
+      "Removed by Parent":["🚫","Removed by Parent"]
+    }[status]||["ℹ️",status];
+  }
+
+  function sendVideoNotification(message){
+    if(BB.store.data.settings.notifications&&window.Notification?.permission==="granted"){
+      try{new Notification("BrightBridge",{body:message,tag:"brightbridge-video-approval"});}catch{}
+    }
+  }
+
+  function renderCaregiverVideoRequests(){
+    if(!BB.videoApprovals.hasCaregiverCode()){
+      return `<section>${pageHead("Request a Video","Adults may request; only a parent can approve.","more")}<div class="mobile-panel mobile-adult-gate"><span>🔐</span><h2>Caregiver requests are not set up yet</h2><p>A parent or guardian must create a separate caregiver request code in the Parent Dashboard.</p></div></section>`;
+    }
+    if(!caregiverActor){
+      return `<section>${pageHead("Request a Video","This request-only area cannot approve or publish videos.","more")}
+        <div class="mobile-panel mobile-caregiver-login"><h2>Adult request access</h2><p>Enter the separate caregiver code created by the parent. The Parent PIN does not belong here.</p>
+          <label><span>Your display name</span><input data-caregiver-login="name" maxlength="60" autocomplete="name"></label>
+          <label><span>Your role</span><select data-caregiver-login="role">${BB.videoApprovals.caregiverRoles.map(role=>`<option>${esc(role)}</option>`).join("")}</select></label>
+          <label><span>Relationship to the child</span><input data-caregiver-login="relationship" maxlength="60" placeholder="Example: classroom teacher"></label>
+          <label><span>Caregiver request code</span><input type="password" inputmode="numeric" data-caregiver-login="code" maxlength="8" autocomplete="off"></label>
+          <button class="mobile-button mobile-wide-button" type="button" data-action="caregiver-unlock">Open Request Area</button>
+        </div></section>`;
+    }
+    const requests=BB.videoApprovals.ownRequests(caregiverActor),editing=requests.find(item=>item.requestId===editingApprovalRequestId);
+    const categories=videoData().categories||[];
+    return `<section>${pageHead("Caregiver Video Requests","Requests stay hidden from children until a parent approves.","more")}
+      <div class="mobile-video-notice"><span>🛡️</span><div><strong>Request-only access</strong><small>You cannot approve or publish a video from this area.</small></div></div>
+      <div class="mobile-panel mobile-video-request-form"><h2>${editing?"Edit and resubmit request":"Request a Video"}</h2>
+        <p>Requesting as <strong>${esc(caregiverActor.displayName)}</strong> · ${esc(caregiverActor.role)} · ${esc(caregiverActor.relationship)}</p>
+        <label><span>YouTube video ID or URL</span><input data-request-field="videoUrl" value="${esc(editing?.videoUrl||editing?.youtubeVideoId||"")}" maxlength="500" autocomplete="off"></label>
+        <label><span>Video title</span><input data-request-field="title" value="${esc(editing?.title||"")}" maxlength="100"></label>
+        <label><span>Channel or creator name</span><input data-request-field="channelName" value="${esc(editing?.channelName||"")}" maxlength="100"></label>
+        <label><span>Category</span><select data-request-field="category">${categories.map(item=>`<option value="${esc(item.id)}" ${item.id===(editing?.category||categories[0]?.id)?"selected":""}>${item.icon} ${esc(item.label)}</option>`).join("")}</select></label>
+        <label><span>Why are you requesting this video?</span><textarea data-request-field="reason" maxlength="400">${esc(editing?.reason||"")}</textarea></label>
+        <label><span>Suggested age range</span><input data-request-field="suggestedAgeRange" value="${esc(editing?.suggestedAgeRange||"")}" maxlength="60" placeholder="Example: Ages 4–7"></label>
+        <label><span>Sensory notes (optional)</span><textarea data-request-field="sensoryNotes" maxlength="300">${esc(editing?.sensoryNotes||"")}</textarea></label>
+        <label><span>Message to the parent (optional)</span><textarea data-request-field="caregiverMessage" maxlength="400">${esc(editing?.caregiverMessage||"")}</textarea></label>
+        <div class="mobile-button-row"><button class="mobile-button" type="button" data-action="caregiver-submit-request">${editing?"Save & resubmit":"Send to parent"}</button>${editing?'<button class="mobile-button secondary" type="button" data-action="caregiver-cancel-edit">Cancel</button>':""}</div>
+      </div>
+      <div class="mobile-section-title"><h2>My request statuses</h2><small>${requests.length}</small></div>
+      <div class="mobile-request-list">${requests.sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt)).map(request=>{const [icon,label]=requestStatusMeta(request.status);return `<article class="mobile-request-card status-${request.status.toLowerCase().replaceAll(" ","-")}">
+        <div class="mobile-request-head"><span>${icon}</span><div><strong>${esc(request.title)}</strong><small>${esc(label)} · ${new Date(request.submittedAt).toLocaleString()}</small></div></div>
+        ${request.status==="Approved"?'<p class="mobile-request-result success">Your video request was approved.</p>':""}
+        ${request.status==="Rejected"?`<p class="mobile-request-result danger">This video request was not approved.${request.rejectionReason?` Reason: ${esc(request.rejectionReason)}.`:""}</p>`:""}
+        ${request.status==="Changes Requested"?`<p class="mobile-request-result warning">The parent requested changes to your video request.${request.changeRequestMessage?` ${esc(request.changeRequestMessage)}`:""}</p>`:""}
+        <div class="mobile-request-actions">${["Draft","Changes Requested"].includes(request.status)?`<button type="button" data-request-edit="${esc(request.requestId)}">✏️ Edit</button>`:""}${request.status==="Pending Parent Approval"?`<button class="danger" type="button" data-request-withdraw="${esc(request.requestId)}">Withdraw</button>`:""}</div>
+      </article>`;}).join("")||'<div class="mobile-video-empty"><p>No requests submitted yet.</p></div>'}</div>
+      <button class="mobile-button secondary mobile-wide-button" type="button" data-action="caregiver-lock">Close caregiver session</button>
+    </section>`;
+  }
+
+  function requestFormDraft(){
+    const value=name=>document.querySelector(`[data-request-field="${name}"]`)?.value?.trim()||"";
+    const raw=value("videoUrl"),youtubeVideoId=extractYouTubeId(raw);
+    return {
+      childIds:[activeProfile().id],videoUrl:raw,youtubeVideoId,title:value("title"),channelName:value("channelName"),
+      thumbnailUrl:youtubeVideoId?`https://i.ytimg.com/vi/${youtubeVideoId}/hqdefault.jpg`:"",
+      category:value("category"),reason:value("reason"),suggestedAgeRange:value("suggestedAgeRange"),
+      sensoryNotes:value("sensoryNotes"),caregiverMessage:value("caregiverMessage")
+    };
+  }
+
+  function submitCaregiverRequest(){
+    if(!caregiverActor)return;
+    const draft=requestFormDraft();
+    if(!draft.youtubeVideoId){toast("Enter a valid individual YouTube video ID or URL.");return;}
+    try{
+      if(editingApprovalRequestId){
+        BB.videoApprovals.edit(caregiverActor,editingApprovalRequestId,draft);
+        BB.videoApprovals.resubmit(caregiverActor,editingApprovalRequestId);
+        editingApprovalRequestId="";toast("Your updated video request was sent to the parent.");
+      }else{
+        BB.videoApprovals.submit(caregiverActor,draft);
+        toast("Your video request was sent to the parent for approval. It will not appear in the child’s video library unless the parent approves it.");
+      }
+      sendVideoNotification("A caregiver has requested a video for your review.");
+      view.innerHTML=renderCaregiverVideoRequests();resetPageScroll();
+    }catch(error){toast(error.message||"The request could not be saved.");}
+  }
+
+  function parentApprovalRequests(){
+    if(!parentVideoActor)return [];
+    return BB.videoApprovals.parentRequests(parentVideoActor,BB.store.data.profiles.map(profile=>profile.id));
+  }
+
+  function renderParentVideoApprovals(){
+    if(!parentUnlocked||!parentVideoActor){
+      setTimeout(()=>showPin(()=>go("videoApprovals",{replace:true})),0);
+      return `<section>${pageHead("Video Approval Requests","A Parent PIN protects final approval.","parent")}<div class="mobile-panel"><h2>Parent authorization required</h2></div></section>`;
+    }
+    const requests=parentApprovalRequests(),pending=requests.filter(item=>item.status==="Pending Parent Approval").length;
+    const settings=BB.videoApprovals.settings(parentVideoActor);
+    return `<section>${pageHead("Video Approval Requests","Only a parent or guardian can approve a requested video.","parent")}
+      <div class="mobile-stats"><div class="mobile-stat"><strong>${pending}</strong><span>Waiting for review</span></div><div class="mobile-stat"><strong>${requests.filter(item=>item.status==="Approved").length}</strong><span>Approved requests</span></div></div>
+      <div class="mobile-panel mobile-approval-settings"><h2>Parent authorization settings</h2>
+        <label><span>Parent or guardian display name</span><input data-parent-video-name value="${esc(settings.parentDisplayName)}" maxlength="60"></label>
+        <label><span>Set or replace caregiver request code</span><input type="password" inputmode="numeric" data-caregiver-code maxlength="8" placeholder="4–8 numbers"></label>
+        <button class="mobile-button secondary mobile-wide-button" type="button" data-action="save-caregiver-code">Save caregiver code</button>
+        <p class="muted">This code opens request-only access. It never grants Parent Dashboard or approval access.</p>
+      </div>
+      <div class="mobile-section-title"><h2>Requests</h2><small>${requests.length}</small></div>
+      <div class="mobile-request-list">${requests.sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt)).map(request=>renderParentRequestCard(request)).join("")||'<div class="mobile-video-empty"><p>No caregiver video requests yet.</p></div>'}</div>
+    </section>`;
+  }
+
+  function renderParentRequestCard(request){
+    const [icon,label]=requestStatusMeta(request.status),thumbnail=videoThumbnail({youtubeId:request.youtubeVideoId,thumbnailUrl:request.thumbnailUrl});
+    const history=parentVideoActor?BB.videoApprovals.auditForParent(parentVideoActor,request.requestId):[];
+    return `<article class="mobile-parent-request status-${request.status.toLowerCase().replaceAll(" ","-")}">
+      <div class="mobile-video-thumb">${thumbnail?`<img src="${thumbnail}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'<span>📺</span>'}${request.demo?'<div class="mobile-demo-badge">LOCAL DEMO</div>':""}</div>
+      <div class="mobile-parent-request-copy"><div class="mobile-status-pill">${icon} ${esc(label)}</div><h2>${esc(request.title)}</h2>
+        <dl><dt>Creator</dt><dd>${esc(request.channelName)}</dd><dt>Requested by</dt><dd>${esc(request.requesterName)} · ${esc(request.requesterRelationship)}</dd><dt>Reason</dt><dd>${esc(request.reason)}</dd><dt>Category</dt><dd>${esc(videoData().categories.find(item=>item.id===request.category)?.label||request.category)}</dd><dt>Suggested age</dt><dd>${esc(request.suggestedAgeRange)}</dd><dt>Sensory notes</dt><dd>${esc(request.sensoryNotes||"None provided")}</dd><dt>Date requested</dt><dd>${new Date(request.submittedAt).toLocaleString()}</dd></dl>
+        ${request.caregiverMessage?`<p><strong>Caregiver message:</strong> ${esc(request.caregiverMessage)}</p>`:""}
+        <div class="mobile-request-actions"><button type="button" data-parent-request-preview="${esc(request.requestId)}">▶ Preview</button>${request.status==="Pending Parent Approval"?`<button class="approve" type="button" data-parent-request-approve="${esc(request.requestId)}">✓ Approve</button><button class="danger" type="button" data-parent-request-reject="${esc(request.requestId)}">Reject</button><button type="button" data-parent-request-changes="${esc(request.requestId)}">Request Changes</button>`:""}${request.status==="Approved"?`<button class="danger" type="button" data-parent-request-remove="${esc(request.requestId)}">Remove From Child’s Library</button>`:""}</div>
+        <details class="mobile-audit-history"><summary>Approval history</summary>${history.map(item=>`<p><strong>${esc(item.action)}</strong><small>${new Date(item.at).toLocaleString()} · ${esc(item.actorRole)}</small></p>`).join("")}</details>
+      </div>
+    </article>`;
+  }
+
+  function approvalRequest(requestId){
+    return parentApprovalRequests().find(item=>item.requestId===requestId);
+  }
+
+  function showApprovalDialog(requestId){
+    if(!parentVideoActor)return;
+    const request=BB.videoApprovals.openRequest(parentVideoActor,requestId);if(!request)return;
+    const profiles=BB.store.data.profiles,categories=videoData().categories;
+    modal(`<div class="mobile-modal-head"><h2>Approve this video for your child?</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div>
+      <p><strong>${esc(request.title)}</strong></p>
+      <div class="mobile-approval-confirmations">${["I reviewed or previewed this video.","I believe this video is appropriate for my child.","I understand that video availability and content may change on YouTube.","I approve this video to appear in my child’s video library."].map(text=>`<label><input type="checkbox" data-approval-confirm><span>${text}</span></label>`).join("")}</div>
+      <fieldset class="mobile-child-assignment"><legend>Approved for</legend>${profiles.map(profile=>`<label><input type="checkbox" data-approval-child="${esc(profile.id)}" ${request.childIds.includes(profile.id)?"checked":""}><span>${profile.avatar||"🌟"} ${esc(profile.name)}</span></label>`).join("")}</fieldset>
+      <label class="mobile-modal-field"><span>Approved category</span><select data-approval-category>${categories.map(item=>`<option value="${esc(item.id)}" ${item.id===request.category?"selected":""}>${item.icon} ${esc(item.label)}</option>`).join("")}</select></label>
+      <label class="mobile-modal-field"><span>Sensory warning</span><textarea data-approval-sensory maxlength="300">${esc(request.sensoryNotes||"")}</textarea></label>
+      <label class="mobile-modal-field"><span>Daily viewing limit in minutes (0 means no limit)</span><input type="number" min="0" max="1440" data-approval-limit value="0"></label>
+      <label class="mobile-modal-field"><span>Expiration date (optional)</span><input type="date" data-approval-expires></label>
+      <label class="mobile-video-check"><input type="checkbox" data-approval-repeat><span>Allow the child to manually replay after it finishes</span></label>
+      <label class="mobile-video-check"><input type="checkbox" data-approval-enabled checked><span>Enable immediately after approval</span></label>
+      <label class="mobile-modal-field"><span>Private parent note (never shown to the child)</span><textarea data-approval-parent-note maxlength="400"></textarea></label>
+      <button class="mobile-button mobile-wide-button" type="button" data-final-approve="${esc(requestId)}" disabled>Final Approve</button>`,"Approve requested video");
+  }
+
+  function updateApprovalButton(){
+    const button=document.querySelector("[data-final-approve]");if(!button)return;
+    const confirmations=[...document.querySelectorAll("[data-approval-confirm]")],children=[...document.querySelectorAll("[data-approval-child]")];
+    button.disabled=confirmations.length!==4||!confirmations.every(input=>input.checked)||!children.some(input=>input.checked);
+  }
+
+  function finishApproval(requestId){
+    if(!parentVideoActor)return;
+    const request=approvalRequest(requestId);if(!request)return;
+    try{
+      const childIds=[...document.querySelectorAll("[data-approval-child]:checked")].map(input=>input.dataset.approvalChild);
+      const approved=BB.videoApprovals.approve(parentVideoActor,requestId,{
+        confirmations:[...document.querySelectorAll("[data-approval-confirm]")].map(input=>input.checked),
+        childIds,category:document.querySelector("[data-approval-category]")?.value,
+        sensoryNotes:document.querySelector("[data-approval-sensory]")?.value,
+        viewingLimitMinutes:document.querySelector("[data-approval-limit]")?.value,
+        expiresAt:document.querySelector("[data-approval-expires]")?.value,
+        allowRepeatPlayback:document.querySelector("[data-approval-repeat]")?.checked,
+        enabled:document.querySelector("[data-approval-enabled]")?.checked,
+        parentNotes:document.querySelector("[data-approval-parent-note]")?.value
+      });
+      const video=normalizeVideo({id:`approved-${requestId}`,requestId,youtubeId:approved.youtubeVideoId,title:approved.title,description:approved.reason,category:approved.category,thumbnailUrl:approved.thumbnailUrl,enabled:approved.enabled,sensoryNotes:approved.sensoryNotes,recommendedAge:approved.suggestedAgeRange,status:approved.status,childIds:approved.childIds,parentId:approved.parentId,parentDisplayName:approved.parentDisplayName,approvedAt:approved.approvedAt,expiresAt:approved.expiresAt,viewingLimitMinutes:approved.viewingLimitMinutes,allowRepeatPlayback:approved.allowRepeatPlayback,originalRequester:approved.requesterName});
+      const index=approvedVideos.findIndex(item=>item.requestId===requestId);
+      if(index>=0)approvedVideos.splice(index,1,video);else approvedVideos.push(video);
+      saveApprovedVideos();closeModal();view.innerHTML=renderParentVideoApprovals();
+      toast("This video has been approved and added to the child’s video library.");sendVideoNotification("Your video request was approved.");
+    }catch(error){toast(error.message||"This request could not be approved.");}
+  }
+
+  function showRejectionDialog(requestId){
+    const reasons=["Not age appropriate","Too loud or overstimulating","Contains advertising or promotions","Contains unsafe or unsuitable content","Not relevant to the child’s goals","Video could not be reviewed","Duplicate request","Other"];
+    modal(`<div class="mobile-modal-head"><h2>Reject video request</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><label class="mobile-modal-field"><span>Reason</span><select data-rejection-reason>${reasons.map(reason=>`<option>${esc(reason)}</option>`).join("")}</select></label><label class="mobile-modal-field"><span>Private parent note (optional)</span><textarea data-rejection-note maxlength="400"></textarea></label><button class="mobile-button danger mobile-wide-button" type="button" data-final-reject="${esc(requestId)}">Reject Request</button>`,"Reject video request");
+  }
+
+  function showChangesDialog(requestId){
+    modal(`<div class="mobile-modal-head"><h2>Request changes</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Ask the caregiver to choose another video, correct the link, add sensory details, or explain the learning purpose.</p><label class="mobile-modal-field"><span>Changes needed</span><textarea data-changes-note maxlength="400" placeholder="Explain what needs to change"></textarea></label><button class="mobile-button mobile-wide-button" type="button" data-final-changes="${esc(requestId)}">Send Change Request</button>`,"Request changes");
+  }
+
+  async function unlockCaregiverRequests(){
+    const value=name=>document.querySelector(`[data-caregiver-login="${name}"]`)?.value?.trim()||"";
+    try{
+      caregiverActor=await BB.videoApprovals.authorizeCaregiver(value("code"),{name:value("name"),role:value("role"),relationship:value("relationship")});
+      if(!caregiverActor){toast("Those caregiver request details did not match.");return;}
+      view.innerHTML=renderCaregiverVideoRequests();resetPageScroll();toast("Request-only caregiver area opened.");
+    }catch(error){toast(error.message||"Caregiver access is unavailable.");}
+  }
+
+  async function saveCaregiverRequestCode(){
+    if(!parentVideoActor)return;
+    const code=document.querySelector("[data-caregiver-code]")?.value||"";
+    const name=document.querySelector("[data-parent-video-name]")?.value||"Parent or Guardian";
+    try{
+      BB.videoApprovals.setParentIdentity(parentVideoActor,name);
+      await BB.videoApprovals.setCaregiverCode(parentVideoActor,code);
+      view.innerHTML=renderParentVideoApprovals();toast("Caregiver request code saved.");
+    }catch(error){toast(error.message||"The caregiver code could not be saved.");}
+  }
+
+  function rejectParentRequest(requestId){
+    if(!parentVideoActor)return;
+    const reason=document.querySelector("[data-rejection-reason]")?.value||"Other";
+    const note=document.querySelector("[data-rejection-note]")?.value||"";
+    try{
+      BB.videoApprovals.reject(parentVideoActor,requestId,reason,note);
+      closeModal();view.innerHTML=renderParentVideoApprovals();toast("This video request was not approved.");
+      sendVideoNotification("Your video request was not approved.");
+    }catch(error){toast(error.message||"The request could not be rejected.");}
+  }
+
+  function returnParentRequest(requestId){
+    if(!parentVideoActor)return;
+    const note=document.querySelector("[data-changes-note]")?.value.trim()||"";
+    if(!note){toast("Explain what the caregiver should change.");return;}
+    try{
+      BB.videoApprovals.requestChanges(parentVideoActor,requestId,note);
+      closeModal();view.innerHTML=renderParentVideoApprovals();toast("Changes requested from the caregiver.");
+      sendVideoNotification("The parent requested changes to your video request.");
+    }catch(error){toast(error.message||"The change request could not be sent.");}
+  }
+
+  function removeParentApproval(requestId){
+    if(!parentVideoActor||!confirm("Remove this video from your child’s library?"))return;
+    try{
+      const removed=BB.videoApprovals.removeApproval(parentVideoActor,requestId);
+      const video=approvedVideos.find(item=>item.requestId===requestId);
+      if(video){video.status="Removed by Parent";video.enabled=false;video.removedAt=removed.removedAt;saveApprovedVideos();}
+      view.innerHTML=route==="videoManager"?renderVideoManager():renderParentVideoApprovals();toast("Video removed from the child’s library. Approval history was preserved.");
+    }catch(error){toast(error.message||"The approval could not be removed.");}
   }
 
   function customDatabase(){
@@ -805,7 +1111,7 @@
     render(options);
     document.querySelectorAll(".mobile-bottom-nav [data-route]").forEach(button=>{
       const navRoute=button.dataset.route;
-      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","tools","videos","videoManager","parent","settings"].includes(route)));
+      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","tools","videos","videoManager","caregiverVideos","videoApprovals","parent","settings"].includes(route)));
     });
     view.focus({preventScroll:true});
     resetPageScroll();
@@ -819,11 +1125,12 @@
       calm:renderCalm,music:renderMusic,nature:renderNature,daily:renderDaily,
       social:renderSocial,rewards:renderRewards,progress:renderProgress,
       more:renderMore,videos:renderVideos,videoManager:renderVideoManager,
+      caregiverVideos:renderCaregiverVideoRequests,videoApprovals:renderParentVideoApprovals,
       tools:()=>BB.mobileTools.render(),parent:renderParent,settings:renderSettings,
       memory:()=>`${pageHead("Private Memory Studio","Opening the selected caregiver feature…","parent")}<div class="mobile-panel">💜 Gathering private memories…</div>`
     };
     view.innerHTML=(screens[route]||renderHome)();
-    if(!["videos","videoManager"].includes(route)){
+    if(!["videos","videoManager","caregiverVideos","videoApprovals"].includes(route)){
       BB.store.data.activityVisits[route]=(BB.store.data.activityVisits[route]||0)+1;
       BB.store.save();
     }
@@ -851,7 +1158,7 @@
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
-      <div class="mobile-whats-new"><div><span>✨ MOBILE 26</span><h2>Safe approved videos</h2><p>Children see only the individual videos a grown-up chooses.</p></div><div class="mobile-quick-grid"><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>No search, comments, or autoplay</small></button><button type="button" data-route="communication"><span>💬</span><strong>Quick Talk & Card Packs</strong><small>Safety, sensory, school & more</small></button><button type="button" data-route="tools"><span>🧰</span><strong>My Tools</strong><small>Schedules, choices & photos</small></button><button type="button" data-route="parent"><span>🔒</span><strong>Grown-up Controls</strong><small>Manage the approved video shelf</small></button></div></div>
+      <div class="mobile-whats-new"><div><span>✨ MOBILE 27</span><h2>Parent Video Approval</h2><p>Caregivers may request. Only a Parent-PIN approval can publish to a child.</p></div><div class="mobile-quick-grid"><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>Only assigned, active approvals</small></button><button type="button" data-route="caregiverVideos"><span>📨</span><strong>Request a Video</strong><small>Separate caregiver request access</small></button><button type="button" data-route="communication"><span>💬</span><strong>Quick Talk & Card Packs</strong><small>Safety, sensory, school & more</small></button><button type="button" data-route="parent"><span>🔒</span><strong>Parent Approvals</strong><small>Review, approve, reject, or remove</small></button></div></div>
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
@@ -1008,6 +1315,7 @@
       ["music","🎹","Music","Free musical play","#fff0c9"],
       ["nature","🦋","Nature","Oceans, gardens, and space","#ddf5ed"],
       ["videos","📺","Approved Videos","A safe, grown-up-curated video shelf","#fce2f0"],
+      ["caregiverVideos","📨","Request a Video","Request-only access for authorized caregivers","#fff0c9"],
       ["rewards","🌻","Reward Garden","Celebrate effort","#fff0bd"],
       ["progress","📈","My Progress","Personal growth only","#ddf5ed"],
       ["tools","🧰","My Tools","Schedules, choices, photos, and guided mode","#e5f2ff"],
@@ -1043,7 +1351,7 @@
         </details>
       </div>
       <div class="mobile-profile-actions"><button class="mobile-button secondary" type="button" data-action="add-profile"><span>➕</span><strong>Add another profile</strong><small>Create a separate private journey</small></button><button class="mobile-button secondary" type="button" data-route="communication"><span>🎙️</span><strong>Family Voice Cards</strong><small>Record beside exact communication cards</small></button></div>
-      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button><button class="mobile-button secondary" type="button" data-action="export">⬇ Export progress</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
+      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button secondary" type="button" data-route="videoApprovals">📨 Video Approval Requests</button><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button><button class="mobile-button secondary" type="button" data-action="export">⬇ Export progress</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
     </section>`;
   }
 
@@ -1079,6 +1387,7 @@
     if(!input)return;
     if(input.value===BB.store.data.settings.parentPin){
       parentUnlocked=true;
+      parentVideoActor=BB.videoApprovals.authorizeParent(input.value,BB.store.data.settings.parentPin);
       const success=pinSuccess;
       modalRoot.innerHTML="";
       pinSuccess=null;
@@ -1207,13 +1516,33 @@
     const videoPlay=event.target.closest("[data-video-play]");
     if(videoPlay){const video=enabledVideos().find(item=>item.id===videoPlay.dataset.videoPlay);if(video)openVideoPlayer(video);return;}
     const videoPreview=event.target.closest("[data-video-preview]");
-    if(videoPreview&&parentUnlocked){const video=approvedVideos.find(item=>item.id===videoPreview.dataset.videoPreview);if(video?.youtubeId)openVideoPlayer(video);return;}
+    if(videoPreview&&parentUnlocked){const video=approvedVideos.find(item=>item.id===videoPreview.dataset.videoPreview);if(video?.youtubeId)openVideoPlayer(video,true);return;}
     const videoEdit=event.target.closest("[data-video-edit]");
     if(videoEdit&&parentUnlocked){editingVideoId=videoEdit.dataset.videoEdit;view.innerHTML=renderVideoManager();resetPageScroll();return;}
     const videoToggle=event.target.closest("[data-video-toggle]");
     if(videoToggle&&parentUnlocked){const video=approvedVideos.find(item=>item.id===videoToggle.dataset.videoToggle);if(video){if(!video.youtubeId){toast("Add and review a YouTube video before enabling this entry.");return;}video.enabled=!video.enabled;video.placeholder=false;saveApprovedVideos();view.innerHTML=renderVideoManager();toast(video.enabled?"Video enabled":"Video hidden from children");}return;}
     const videoRemove=event.target.closest("[data-video-remove]");
-    if(videoRemove&&parentUnlocked){const video=approvedVideos.find(item=>item.id===videoRemove.dataset.videoRemove);if(video&&confirm(`Remove “${video.title}” from the approved list?`)){approvedVideos=approvedVideos.filter(item=>item.id!==video.id);saveApprovedVideos();if(editingVideoId===video.id)editingVideoId="";view.innerHTML=renderVideoManager();toast("Video removed");}return;}
+    if(videoRemove&&parentUnlocked){const video=approvedVideos.find(item=>item.id===videoRemove.dataset.videoRemove);if(video?.requestId){removeParentApproval(video.requestId);return;}if(video&&confirm(`Remove “${video.title}” from the approved list?`)){approvedVideos=approvedVideos.filter(item=>item.id!==video.id);saveApprovedVideos();if(editingVideoId===video.id)editingVideoId="";view.innerHTML=renderVideoManager();toast("Video removed");}return;}
+    const requestEdit=event.target.closest("[data-request-edit]");
+    if(requestEdit&&caregiverActor){editingApprovalRequestId=requestEdit.dataset.requestEdit;view.innerHTML=renderCaregiverVideoRequests();resetPageScroll();return;}
+    const requestWithdraw=event.target.closest("[data-request-withdraw]");
+    if(requestWithdraw&&caregiverActor&&confirm("Withdraw this pending video request?")){try{BB.videoApprovals.withdraw(caregiverActor,requestWithdraw.dataset.requestWithdraw);view.innerHTML=renderCaregiverVideoRequests();toast("Request withdrawn and returned to Draft.");}catch(error){toast(error.message);}return;}
+    const parentPreview=event.target.closest("[data-parent-request-preview]");
+    if(parentPreview&&parentVideoActor){try{const request=BB.videoApprovals.openRequest(parentVideoActor,parentPreview.dataset.parentRequestPreview);openVideoPlayer({youtubeId:request.youtubeVideoId,title:request.title,sensoryNotes:request.sensoryNotes},true);}catch(error){toast(error.message);}return;}
+    const parentApprove=event.target.closest("[data-parent-request-approve]");
+    if(parentApprove&&parentVideoActor){showApprovalDialog(parentApprove.dataset.parentRequestApprove);return;}
+    const parentReject=event.target.closest("[data-parent-request-reject]");
+    if(parentReject&&parentVideoActor){BB.videoApprovals.openRequest(parentVideoActor,parentReject.dataset.parentRequestReject);showRejectionDialog(parentReject.dataset.parentRequestReject);return;}
+    const parentChanges=event.target.closest("[data-parent-request-changes]");
+    if(parentChanges&&parentVideoActor){BB.videoApprovals.openRequest(parentVideoActor,parentChanges.dataset.parentRequestChanges);showChangesDialog(parentChanges.dataset.parentRequestChanges);return;}
+    const parentRemove=event.target.closest("[data-parent-request-remove]");
+    if(parentRemove&&parentVideoActor){removeParentApproval(parentRemove.dataset.parentRequestRemove);return;}
+    const finalApprove=event.target.closest("[data-final-approve]");
+    if(finalApprove&&parentVideoActor&&!finalApprove.disabled){finishApproval(finalApprove.dataset.finalApprove);return;}
+    const finalReject=event.target.closest("[data-final-reject]");
+    if(finalReject&&parentVideoActor){rejectParentRequest(finalReject.dataset.finalReject);return;}
+    const finalChanges=event.target.closest("[data-final-changes]");
+    if(finalChanges&&parentVideoActor){returnParentRequest(finalChanges.dataset.finalChanges);return;}
     const pinKey=event.target.closest("[data-pin-key]");
     if(pinKey){const input=document.querySelector("[data-pin]");if(!input)return;const key=pinKey.dataset.pinKey;if(key==="clear")input.value="";else if(key==="back")input.value=input.value.slice(0,-1);else if(input.value.length<4)input.value+=key;updatePin();if(input.value.length===4)verifyPin();return;}
     const categoryButton=event.target.closest("[data-category]");
@@ -1252,6 +1581,11 @@
       case "video-save":saveVideoFromForm();break;
       case "video-cancel-edit":editingVideoId="";view.innerHTML=renderVideoManager();resetPageScroll();break;
       case "close-video":closeModal();if(route==="videos"){view.innerHTML=renderVideos();view.focus({preventScroll:true});}break;
+      case "caregiver-unlock":unlockCaregiverRequests();break;
+      case "caregiver-submit-request":submitCaregiverRequest();break;
+      case "caregiver-cancel-edit":editingApprovalRequestId="";view.innerHTML=renderCaregiverVideoRequests();resetPageScroll();break;
+      case "caregiver-lock":BB.videoApprovals.closeCaregiver(caregiverActor);caregiverActor=null;editingApprovalRequestId="";view.innerHTML=renderCaregiverVideoRequests();break;
+      case "save-caregiver-code":saveCaregiverRequestCode();break;
       case "record-stop":stopRecording();break;
       case "sentence-clear":sentence="";refreshCommunication();break;
       case "sentence-speak":{const value=(document.querySelector("[data-sentence]")?.value||sentence).trim();sentence=value;if(value){speakExact(value);BB.store.data.recentPhrases.unshift(value);BB.store.data.recentPhrases=BB.store.data.recentPhrases.slice(0,20);BB.store.save();BB.memoryJourney?.track("communication","First sentence created",{icon:"💬",detail:value,onceKey:"first-sentence"});pip(value,"😊");}else toast("Add words to the sentence first.");break;}
@@ -1268,12 +1602,12 @@
       case "verify-pin":verifyPin();break;
       case "change-pin":modal(`<div class="mobile-modal-head"><h2>Change parent PIN</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><input class="pin-entry" type="password" inputmode="numeric" maxlength="4" data-new-pin placeholder="New 4-digit PIN"><button class="mobile-button pin-continue" type="button" data-action="save-pin">Save PIN</button>`,"Change PIN");break;
       case "save-pin":{const value=document.querySelector("[data-new-pin]")?.value;if(/^\d{4}$/.test(value)){BB.store.data.settings.parentPin=value;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers.");break;}
-      case "lock-parent":parentUnlocked=false;toast("Grown-up Area locked");go("more",{replace:true});break;
+      case "lock-parent":BB.videoApprovals.closeParent(parentVideoActor);parentVideoActor=null;parentUnlocked=false;toast("Grown-up Area locked");go("more",{replace:true});break;
       case "install":if(installPrompt){installPrompt.prompt();installPrompt.userChoice.finally(()=>installPrompt=null);}else modal(`<div class="mobile-modal-head"><h2>Install BrightBridge</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Open your browser menu and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.</p><button class="mobile-button" type="button" data-action="close-modal">Got it</button>`,"Install BrightBridge");break;
       case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();go("parent",{replace:true});break;}
       case "delete-profile":{if(BB.store.data.profiles.length<2)break;if(confirm(`Delete ${activeProfile().name}'s profile? Private recordings must be deleted separately.`)){BB.store.data.profiles=BB.store.data.profiles.filter(item=>item.id!==BB.store.data.activeProfile);BB.store.data.activeProfile=BB.store.data.profiles[0].id;BB.store.save();go("parent",{replace:true});}break;}
       case "export":exportProgress();break;
-      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear(),clearCustomCards()]).finally(()=>{clearApprovedVideos();BB.store.reset();parentUnlocked=false;go("home");});break;
+      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),BB.memoryJourney.clear(),clearCustomCards()]).finally(()=>{if(parentVideoActor)BB.videoApprovals.clear(parentVideoActor);clearApprovedVideos();BB.store.reset();parentVideoActor=null;caregiverActor=null;parentUnlocked=false;go("home");});break;
       case "close-modal":closeModal();break;
       case "modal-overlay":if(event.target===action)closeModal();break;
     }
@@ -1289,6 +1623,7 @@
 
   function handleChange(event){
     if(event.target.matches("[data-upload-card]"))uploadVoice(event.target);
+    if(event.target.matches("[data-approval-confirm],[data-approval-child]"))updateApprovalButton();
     if(event.target.matches("[data-profile-birthday]")){activeProfile().birthDate=event.target.value;BB.store.save();}
     if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;customLoadedProfile="";BB.store.save();go("parent",{replace:true});}
     if(event.target.matches("[data-setting-select]")){BB.store.data.settings[event.target.dataset.settingSelect]=event.target.value;BB.store.save();}

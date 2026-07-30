@@ -18,7 +18,9 @@
       {id:"social-skills",label:"Social Skills",icon:"🤝",color:"#ddf5ed"},
       {id:"calm-sensory",label:"Calm & Sensory",icon:"🌈",color:"#dff4ff"},
       {id:"songs-movement",label:"Songs & Movement",icon:"🎵",color:"#fce2f0"},
-      {id:"story-time",label:"Story Time",icon:"📖",color:"#e6f1ff"}
+      {id:"story-time",label:"Story Time",icon:"📖",color:"#e6f1ff"},
+      {id:"daily-routines",label:"Daily Routines",icon:"🪥",color:"#e5f2ff"},
+      {id:"other",label:"Other",icon:"✨",color:"#f2edff"}
     ],
     videos:[
       {

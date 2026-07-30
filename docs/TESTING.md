@@ -66,7 +66,7 @@ At widths up to 720 pixels:
 
 1. Confirm **Approved Videos** appears on Home and More without changing the
    five-item bottom navigation.
-2. Confirm all seven category buttons have large touch targets and that disabled
+2. Confirm all nine category buttons have large touch targets and that disabled
    placeholders do not appear in the child library.
 3. Unlock the existing Grown-up Area, open **Manage approved videos**, and add an
    individual non-live YouTube ID to each category.
@@ -84,6 +84,34 @@ At widths up to 720 pixels:
    field, YouTube sign-in request, or saved viewing-history record.
 10. Repeat at 320, 360, 390, 430, 600, and 720 CSS pixels with large text, dark
     mode, high contrast, and reduced motion enabled.
+
+## Parent Video Approval
+
+1. Confirm the parent must create a separate caregiver request code before the
+   request area opens.
+2. Submit a caregiver request and confirm it remains absent from every child
+   video library.
+3. Confirm the request appears in **Parent Dashboard → Video Approval Requests**
+   after the existing Parent PIN is entered.
+4. Preview without autoplay and verify an approval-history entry is created.
+5. Confirm **Final Approve** remains disabled until all four confirmations and
+   at least one child profile are checked.
+6. Approve for one child and verify it is absent when another profile is active.
+7. Reject a disposable request and confirm it never appears for children.
+8. Request changes, return to caregiver request access, edit, and resubmit.
+9. Withdraw a pending request and confirm it returns to Draft.
+10. Approve with yesterday as the expiration date and confirm it becomes
+    Expired and disappears from the child library.
+11. Revoke an approved video and verify it disappears immediately while its
+    audit history remains.
+12. Set a short daily limit and confirm playback stops when the local allowance
+    is used.
+13. Confirm a caregiver data capability cannot approve, reject, edit parent
+    notes, or revoke a request.
+14. Restart the app and confirm requests, statuses, approvals, and audit entries
+    remain stored.
+15. On localhost only, test `?videoApprovalDemo=1`; confirm the demo is marked
+    and that the same query on GitHub Pages creates no demo records.
 
 ## Offline and PWA
 
