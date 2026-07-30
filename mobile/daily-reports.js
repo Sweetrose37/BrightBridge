@@ -74,6 +74,9 @@
       videosViewed: {},
       videoSeconds: 0,
       goalsCompleted: {},
+      starsEarned: 0,
+      starReasons: {},
+      weekendBonusStars: 0,
       caregiverNotes: [],
       parentNotes: [],
       safetyEvents: [],
@@ -199,6 +202,17 @@
     BB.store.save();
   }
 
+  function recordStars(profileId, amount = 1, reason = "Positive progress", value = new Date(), weekendBonus = false) {
+    const report = ensureDay(profileId, value, false);
+    if (!report) return;
+    const stars = Math.max(0, Number(amount) || 0);
+    report.starsEarned = (Number(report.starsEarned) || 0) + stars;
+    if (weekendBonus) report.weekendBonusStars = (Number(report.weekendBonusStars) || 0) + stars;
+    addCount(report.starReasons, reason, stars);
+    touch(report, "reward", `${stars} ${stars === 1 ? "star" : "stars"}: ${reason}`);
+    BB.store.save();
+  }
+
   function recordVideo(profileId, video = {}) {
     const report = ensureDay(profileId, new Date(), false);
     const label = String(video.title || "Approved video");
@@ -288,9 +302,9 @@
   function aggregate(items = []) {
     const result = newRecord("summary", items.length ? `${items.at(-1).reportDate} to ${items[0].reportDate}` : localDate());
     result.totalAppSessions = 0;
-    const maps = ["communicationCategoryCounts", "phraseCounts", "feelingsSelected", "calmStrategiesUsed", "needsCommunicated", "videosViewed", "goalsCompleted"];
+    const maps = ["communicationCategoryCounts", "phraseCounts", "feelingsSelected", "calmStrategiesUsed", "needsCommunicated", "videosViewed", "goalsCompleted", "starReasons"];
     for (const report of items) {
-      ["totalAppSessions", "totalSessionSeconds", "totalCardTaps", "parentVoiceUsageCount", "defaultVoiceUsageCount", "textToSpeechUsageCount", "visualFallbackUsageCount", "videoSeconds"].forEach(field => result[field] += Number(report[field]) || 0);
+      ["totalAppSessions", "totalSessionSeconds", "totalCardTaps", "parentVoiceUsageCount", "defaultVoiceUsageCount", "textToSpeechUsageCount", "visualFallbackUsageCount", "videoSeconds", "starsEarned", "weekendBonusStars"].forEach(field => result[field] += Number(report[field]) || 0);
       report.uniqueCardKeys.forEach(key => { if (!result.uniqueCardKeys.includes(key)) result.uniqueCardKeys.push(key); });
       maps.forEach(field => Object.entries(report[field] || {}).forEach(([key, value]) => addCount(result[field], key, value)));
       result.safetyEvents.push(...(report.safetyEvents || []));
@@ -305,7 +319,7 @@
   }
 
   function plainSummary(report) {
-    if (!report || (!report.totalCardTaps && !report.totalSessionSeconds && !Object.keys(report.videosViewed || {}).length)) {
+    if (!report || (!report.totalCardTaps && !report.totalSessionSeconds && !Object.keys(report.videosViewed || {}).length && !report.starsEarned)) {
       return "No app activity was recorded for this day.";
     }
     const phrases = topEntries(report.phraseCounts, report.excludedPhraseKeys, 2).map(([phrase]) => phrase);
@@ -314,6 +328,7 @@
     if (phrases.length) parts.push(`The child used the app most often to communicate “${phrases.join("” and “")}.”`);
     if (feeling) parts.push(`The most frequently selected feeling was “${feeling}.”`);
     if (report.parentVoiceUsageCount) parts.push(`Parent-recorded voice cards were used ${report.parentVoiceUsageCount} ${report.parentVoiceUsageCount === 1 ? "time" : "times"}.`);
+    if (report.starsEarned) parts.push(`${report.starsEarned} ${report.starsEarned === 1 ? "star was" : "stars were"} collected${report.weekendBonusStars ? `, including ${report.weekendBonusStars} weekend incentive bonus stars` : ""}.`);
     return parts.join(" ") || "Activity was recorded without enough communication selections to create a longer summary.";
   }
 
@@ -331,6 +346,8 @@
       `Total time using the app: ${Math.round((report.totalSessionSeconds || 0) / 60)} minutes`,
       `Communication-card selections: ${report.totalCardTaps || 0}`,
       `Different cards used: ${(report.uniqueCardKeys || []).length}`,
+      `Stars collected: ${report.starsEarned || 0}`,
+      `Weekend incentive bonus stars: ${report.weekendBonusStars || 0}`,
       `Most active communication category: ${topEntries(report.communicationCategoryCounts, [], 1)[0]?.[0] || "No activity recorded"}`, "",
       "MOST USED COMMUNICATIONS",
       ...(topEntries(report.phraseCounts, report.excludedPhraseKeys).map(([phrase, count], index) => `${index + 1}. “${phrase}” — used ${count} ${count === 1 ? "time" : "times"}`) || [])
@@ -371,10 +388,11 @@
 
   function csv(items = []) {
     const quote = value => `"${String(value ?? "").replace(/"/g, '""')}"`;
-    const headings = ["Date", "Child", "Total Sessions", "Total Minutes", "Card Selections", "Most Used Phrase", "Most Used Category", "Feelings Communicated", "Needs Communicated", "Calm Strategies Used", "Parent Voice Uses", "Videos Watched", "Notes"];
+    const headings = ["Date", "Child", "Total Sessions", "Total Minutes", "Card Selections", "Stars Collected", "Weekend Bonus Stars", "Most Used Phrase", "Most Used Category", "Feelings Communicated", "Needs Communicated", "Calm Strategies Used", "Parent Voice Uses", "Videos Watched", "Notes"];
     const rows = items.map(report => [
       report.reportDate, profileName(report.childProfileId), report.totalAppSessions || 0,
       Math.round((report.totalSessionSeconds || 0) / 60), report.totalCardTaps || 0,
+      report.starsEarned || 0, report.weekendBonusStars || 0,
       topEntries(report.phraseCounts, report.excludedPhraseKeys, 1)[0]?.[0] || "No activity recorded",
       topEntries(report.communicationCategoryCounts, [], 1)[0]?.[0] || "No activity recorded",
       topEntries(report.feelingsSelected, []).map(([label, count]) => `${label} (${count})`).join("; ") || "None recorded",
@@ -394,7 +412,7 @@
   window.BB = window.BB || {};
   BB.dailyReports = {
     localDate, ensureDay, checkRollover, startSession, addSessionSeconds,
-    recordCard, markVoice, recordFeeling, recordCalm, recordGoal,
+    recordCard, markVoice, recordFeeling, recordCalm, recordGoal, recordStars,
     recordVideo, addVideoSeconds, records, aggregate, updateRecord,
     addParentNote, editParentNote, togglePhraseExclusion, topEntries, profileName,
     plainSummary, formatText, csv, safeFileName, reportingState

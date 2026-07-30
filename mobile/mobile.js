@@ -1168,7 +1168,7 @@
   }
 
   function updateHeader(){
-    document.querySelector("#header-stars").textContent=BB.store.data.stars;
+    document.querySelector("#header-stars").textContent=BB.weeklyRewards?.status(activeProfile().id).currentStars??BB.store.data.stars;
   }
 
   function toast(message){
@@ -1586,19 +1586,21 @@
   }
 
   function renderRewards(){
-    const data=BB.store.data;
+    const data=BB.store.data,reward=BB.weeklyRewards.status(activeProfile().id);
     return `<section>${pageHead("Reward Garden","Every effort helps your own garden grow.","more")}
+      <div class="mobile-weekly-reward ${reward.type==="weekend"?"is-weekend":reward.day===5?"is-friday":""}"><div><span>${reward.type==="weekend"?"🎉":"⭐"}</span><div><h2>${esc(reward.title)}</h2><p>${esc(reward.message)}</p></div></div>${reward.type==="weekend"?`<div class="mobile-weekend-days"><span class="${reward.weekendDays.some(date=>new Date(`${date}T12:00:00`).getDay()===6)?"done":""}">Saturday ${reward.weekendDays.some(date=>new Date(`${date}T12:00:00`).getDay()===6)?"✓":""}</span><span class="${reward.weekendDays.some(date=>new Date(`${date}T12:00:00`).getDay()===0)?"done":""}">Sunday ${reward.weekendDays.some(date=>new Date(`${date}T12:00:00`).getDay()===0)?"✓":""}</span></div>`:""}</div>
       <div class="mobile-garden"><h2>Your garden</h2><div class="mobile-garden-items">${Array.from({length:Math.min(6,data.flowers)},()=>"<span>🌻</span>").join("")||"<span>🌱</span>"}${Array.from({length:Math.min(4,data.butterflies)},()=>"<span>🦋</span>").join("")}</div></div>
-      <div class="mobile-stats" style="margin-top:12px"><div class="mobile-stat"><strong>⭐ ${data.stars}</strong><span>Stars</span></div><div class="mobile-stat"><strong>🌻 ${data.flowers}</strong><span>Flowers</span></div><div class="mobile-stat"><strong>🦋 ${data.butterflies}</strong><span>Butterflies</span></div><div class="mobile-stat"><strong>🎟️ ${data.stickers.length}</strong><span>Stickers</span></div></div>
+      <div class="mobile-stats" style="margin-top:12px"><div class="mobile-stat"><strong>⭐ ${reward.currentStars}</strong><span>${reward.type==="weekend"?"Weekend":"Weekday"} stars</span></div><div class="mobile-stat"><strong>🌻 ${data.flowers}</strong><span>Flowers</span></div><div class="mobile-stat"><strong>🦋 ${data.butterflies}</strong><span>Butterflies</span></div><div class="mobile-stat"><strong>🎟️ ${data.stickers.length}</strong><span>Stickers</span></div></div>
       <div class="mobile-panel" style="margin-top:13px"><h2>Sticker Collection</h2><div class="mobile-sticker-row">${data.stickers.length?data.stickers.map(item=>`<span>${item}</span>`).join(""):"<p>Your first sticker is waiting for your fourth star.</p>"}</div><h2>Achievements</h2><div class="mobile-list">${BB.rewards.achievements.map(item=>`<div class="mobile-list-card ${data.achievements.includes(item.id)?"done":""}"><span>${data.achievements.includes(item.id)?item.icon:"🔒"}</span><div><strong>${item.name}</strong><small>${data.achievements.includes(item.id)?"Earned through personal progress":"Keep exploring"}</small></div></div>`).join("")}</div></div>
     </section>`;
   }
 
   function renderProgress(){
     const data=BB.store.data;
+    const reward=BB.weeklyRewards.status(activeProfile().id);
     const completed=Object.values(data.progress).reduce((sum,value)=>sum+value,0);
     return `<section>${pageHead("My Progress","Celebrate this child's own journey only.","more")}
-      <div class="mobile-stats"><div class="mobile-stat"><strong>${data.stars}</strong><span>Stars earned</span></div><div class="mobile-stat"><strong>${completed}</strong><span>Activities completed</span></div><div class="mobile-stat"><strong>${Object.keys(data.wordUse).length}</strong><span>Words explored</span></div><div class="mobile-stat"><strong>${Math.floor(data.screenSeconds/60)}m</strong><span>App time</span></div></div>
+      <div class="mobile-stats"><div class="mobile-stat"><strong>${reward.currentStars}</strong><span>Current reward stars</span></div><div class="mobile-stat"><strong>${completed}</strong><span>Activities completed</span></div><div class="mobile-stat"><strong>${Object.keys(data.wordUse).length}</strong><span>Words explored</span></div><div class="mobile-stat"><strong>${Math.floor(data.screenSeconds/60)}m</strong><span>App time</span></div></div>
       <div class="mobile-panel" style="margin-top:13px"><h3>Favorite areas</h3>${Object.entries(data.activityVisits).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,count])=>`<p><strong>${esc(name)}</strong> · ${count} visits</p>`).join("")||"<p>Your journey begins with the first activity.</p>"}</div>
     </section>`;
   }
@@ -1631,14 +1633,14 @@
     const topCategory=BB.dailyReports.topEntries(report.communicationCategoryCounts||{},[],1)[0]?.[0]||"No activity recorded";
     const videoCount=Object.values(report.videosViewed||{}).reduce((sum,count)=>sum+count,0);
     const notes=[...(report.caregiverNotes||[]),...(report.parentNotes||[])];
-    const empty=!report.totalCardTaps&&!report.totalSessionSeconds&&!videoCount;
+    const empty=!report.totalCardTaps&&!report.totalSessionSeconds&&!videoCount&&!report.starsEarned;
     return `<article class="mobile-daily-report ${report.reviewed?"is-reviewed":""}" data-report-card="${esc(report.reportDate)}">
       <div class="mobile-report-heading"><div><small>${esc(BB.dailyReports.profileName(report.childProfileId))}</small><h2>${esc(reportDateLabel(report.reportDate))}</h2></div><span>${report.finalizedAt?"Archived":"Live today"}</span></div>
       ${empty?'<div class="mobile-report-empty">No app activity was recorded for this day.</div>':`
       <div class="mobile-report-summary">${esc(BB.dailyReports.plainSummary(report))}</div>
-      <div class="mobile-report-totals"><div><strong>${report.totalAppSessions||0}</strong><span>Sessions</span></div><div><strong>${Math.round((report.totalSessionSeconds||0)/60)}m</strong><span>App time</span></div><div><strong>${report.totalCardTaps||0}</strong><span>Card selections</span></div><div><strong>${(report.uniqueCardKeys||[]).length}</strong><span>Different cards</span></div></div>
+      <div class="mobile-report-totals"><div><strong>${report.totalAppSessions||0}</strong><span>Sessions</span></div><div><strong>${Math.round((report.totalSessionSeconds||0)/60)}m</strong><span>App time</span></div><div><strong>${report.totalCardTaps||0}</strong><span>Card selections</span></div><div><strong>${(report.uniqueCardKeys||[]).length}</strong><span>Different cards</span></div><div><strong>⭐ ${report.starsEarned||0}</strong><span>Stars collected</span></div></div>
       <details><summary>Communication details</summary><h3>Most active category</h3><p>${esc(topCategory)}</p><h3>Most used communications</h3>${topPhrases.length?`<ol>${topPhrases.map(([phrase,count])=>`<li><span>“${esc(phrase)}” — ${count} ${count===1?"time":"times"}</span><button type="button" data-report-exclude="${esc(phrase)}" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Exclude accidental tap</button></li>`).join("")}</ol>`:'<p class="muted">No activity recorded</p>'}<h3>Feelings communicated</h3>${renderReportMap(report.feelingsSelected)}<h3>Needs communicated</h3>${renderReportMap(report.needsCommunicated)}<h3>Calm and sensory support</h3>${renderReportMap(report.calmStrategiesUsed)}</details>
-      <details><summary>Voice, videos, and learning</summary><div class="mobile-report-readable-list"><p><strong>Parent-recorded voice cards:</strong> ${report.parentVoiceUsageCount||0}</p><p><strong>Default voice cards:</strong> ${report.defaultVoiceUsageCount||0}</p><p><strong>Text-to-speech fallback:</strong> ${report.textToSpeechUsageCount||0}</p><p><strong>Videos watched:</strong> ${videoCount}</p><p><strong>Video time:</strong> ${Math.round((report.videoSeconds||0)/60)} minutes</p><p><strong>Goals completed:</strong> ${Object.values(report.goalsCompleted||{}).reduce((sum,count)=>sum+count,0)}</p></div></details>`}
+      <details><summary>Rewards, voice, videos, and learning</summary><div class="mobile-report-readable-list"><p><strong>Stars collected:</strong> ${report.starsEarned||0}</p>${report.weekendBonusStars?`<p><strong>Weekend incentive bonus:</strong> ${report.weekendBonusStars} stars</p>`:""}<p><strong>Parent-recorded voice cards:</strong> ${report.parentVoiceUsageCount||0}</p><p><strong>Default voice cards:</strong> ${report.defaultVoiceUsageCount||0}</p><p><strong>Text-to-speech fallback:</strong> ${report.textToSpeechUsageCount||0}</p><p><strong>Videos watched:</strong> ${videoCount}</p><p><strong>Video time:</strong> ${Math.round((report.videoSeconds||0)/60)} minutes</p><p><strong>Goals completed:</strong> ${Object.values(report.goalsCompleted||{}).reduce((sum,count)=>sum+count,0)}</p></div></details>`}
       ${report.safetyEvents?.length?`<div class="mobile-report-safety"><h3>Safety information</h3>${report.safetyEvents.map(item=>`<p>“${esc(item.phrase)}” — ${new Date(item.timestamp).toLocaleString()}</p>`).join("")}</div>`:""}
       <details open><summary>Parent notes</summary><div class="mobile-report-notes">${(report.caregiverNotes||[]).map(note=>`<p>${esc(note.text)}<small>${esc(note.role||"Caregiver")} · ${new Date(note.timestamp).toLocaleString()}</small></p>`).join("")}${(report.parentNotes||[]).map((note,index)=>`<p>${esc(note.text)}<small>${esc(note.role||"Parent or guardian")} · ${new Date(note.timestamp).toLocaleString()}${note.editedAt?" · corrected":""}</small><button type="button" data-report-note-edit="${index}" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Correct note</button></p>`).join("")||(!notes.length?'<p class="muted">No notes added</p>':"")}</div><label class="mobile-tool-label"><span>Add a private parent note</span><textarea data-report-note="${esc(report.reportDate)}" data-report-note-profile="${esc(report.childProfileId)}" maxlength="1000" placeholder="Add a factual note for this day"></textarea></label><button class="mobile-button secondary" type="button" data-report-note-save="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Save note</button></details>
       <div class="mobile-report-actions"><button class="mobile-button secondary" type="button" data-report-reviewed="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">${report.reviewed?"✓ Reviewed":"Mark reviewed"}</button><button class="mobile-button" type="button" data-report-export="print" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Print / Save PDF</button><button class="mobile-button secondary" type="button" data-report-export="text" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Plain text</button></div>
@@ -1663,7 +1665,7 @@
       </div>
       <div class="mobile-category-row"><button class="mobile-chip ${reportView==="history"?"active":""}" type="button" data-report-view="history">Daily history</button><button class="mobile-chip ${reportView==="week"?"active":""}" type="button" data-report-view="week">Weekly summary</button><button class="mobile-chip ${reportView==="month"?"active":""}" type="button" data-report-view="month">Monthly summary</button></div>
       <div class="mobile-report-export-bar"><button class="mobile-button" type="button" data-report-export="print" data-report-scope="range">Print / Save PDF</button><button class="mobile-button secondary" type="button" data-report-export="csv" data-report-scope="range">Readable CSV</button><button class="mobile-button secondary" type="button" data-report-export="text" data-report-scope="range">Plain text</button><button class="mobile-button secondary" type="button" data-report-export="print" data-report-scope="all">All history PDF</button></div>
-      ${summary?`<div class="mobile-panel"><h2>${reportView==="week"?"Last 7 days":"This month"}</h2><div class="mobile-report-totals"><div><strong>${summaryReports.length}</strong><span>Days</span></div><div><strong>${summary.totalCardTaps}</strong><span>Card selections</span></div><div><strong>${Math.round(summary.totalSessionSeconds/60)}m</strong><span>App time</span></div><div><strong>${summary.parentVoiceUsageCount}</strong><span>Parent voices</span></div></div><p>${esc(BB.dailyReports.plainSummary(summary))}</p></div>`:""}
+      ${summary?`<div class="mobile-panel"><h2>${reportView==="week"?"Last 7 days":"This month"}</h2><div class="mobile-report-totals"><div><strong>${summaryReports.length}</strong><span>Days</span></div><div><strong>${summary.totalCardTaps}</strong><span>Card selections</span></div><div><strong>${Math.round(summary.totalSessionSeconds/60)}m</strong><span>App time</span></div><div><strong>⭐ ${summary.starsEarned||0}</strong><span>Stars collected</span></div></div><p>${esc(BB.dailyReports.plainSummary(summary))}</p></div>`:""}
       <div class="mobile-report-history">${reports.map(renderDailyReportCard).join("")||'<div class="mobile-panel"><h2>No reports match</h2><p>No activity was recorded for the selected child and date range.</p></div>'}</div>
       <details class="mobile-panel"><summary>Advanced technical support</summary><p>This backup contains technical app data and is not the normal parent report.</p><button class="mobile-button secondary" type="button" data-action="export-raw">Export Raw Data for Technical Support</button></details>
     </section>`;
@@ -1694,9 +1696,10 @@
       setTimeout(()=>showPin(),0);
       return `<section>${pageHead("Grown-up Area","A parent PIN protects these private controls.","more")}<div class="mobile-panel" style="text-align:center"><div style="font-size:65px">🔒</div><h2>Grown-up check needed</h2><button class="mobile-button" type="button" data-action="open-pin">Enter PIN</button>${BB.store.data.settings.parentPin==="2468"?'<p class="muted">Starter PIN: 2468</p>':""}</div></section>`;
     }
-    const data=BB.store.data,profile=activeProfile(),todayReport=BB.dailyReports.ensureDay(profile.id);
+    const data=BB.store.data,profile=activeProfile(),todayReport=BB.dailyReports.ensureDay(profile.id),reward=BB.weeklyRewards.status(profile.id);
     return `<section>${pageHead("Parent Dashboard",`Private controls for ${profile.name}.`,"more")}
-      <div class="mobile-stats"><div class="mobile-stat"><strong>${Math.round((todayReport.totalSessionSeconds||0)/60)}m</strong><span>Today’s app time</span></div><div class="mobile-stat"><strong>${todayReport.totalCardTaps||0}</strong><span>Cards today</span></div><div class="mobile-stat"><strong>${data.stars}</strong><span>All-time stars</span></div></div>
+      <div class="mobile-stats"><div class="mobile-stat"><strong>${Math.round((todayReport.totalSessionSeconds||0)/60)}m</strong><span>Today’s app time</span></div><div class="mobile-stat"><strong>${todayReport.totalCardTaps||0}</strong><span>Cards today</span></div><div class="mobile-stat"><strong>⭐ ${todayReport.starsEarned||0}</strong><span>Stars today</span></div></div>
+      <div class="mobile-panel"><h3>${esc(reward.title)}</h3><p>${esc(reward.message)}</p></div>
       <div class="mobile-section-title"><h2>Memories & growth</h2></div>
       <div class="mobile-memory-grid"><button class="mobile-memory-button" type="button" data-mobile-memory-open="voice"><span>🎤</span>Voice Journey</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="timeline"><span>🌈</span>Growth Timeline</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="letters"><span>💌</span>Future Letters</button><button class="mobile-memory-button" type="button" data-mobile-memory-open="growth"><span>🌱</span>Growth Paths</button></div>
       <div class="mobile-profile-summary"><span>${profile.avatar||"🌟"}</span><div><small>Active child profile</small><h2>${esc(profile.name)}</h2></div></div>
@@ -2098,7 +2101,7 @@
       case "save-pin":{const value=document.querySelector("[data-new-pin]")?.value;if(/^\d{4}$/.test(value)){BB.store.data.settings.parentPin=value;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers.");break;}
       case "lock-parent":BB.videoApprovals.closeParent(parentVideoActor);BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;parentUnlocked=false;toast("Grown-up Area locked");go("more",{replace:true});break;
       case "install":if(installPrompt){installPrompt.prompt();installPrompt.userChoice.finally(()=>installPrompt=null);}else modal(`<div class="mobile-modal-head"><h2>Install BrightBridge</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Open your browser menu and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.</p><button class="mobile-button" type="button" data-action="close-modal">Got it</button>`,"Install BrightBridge");break;
-      case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();reportProfile=profile.id;BB.dailyReports.startSession(profile.id);go("parent",{replace:true});break;}
+      case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();reportProfile=profile.id;BB.dailyReports.startSession(profile.id);BB.weeklyRewards.ensure(profile.id);go("parent",{replace:true});break;}
       case "delete-profile":{if(BB.store.data.profiles.length<2)break;if(confirm(`Delete ${activeProfile().name}'s profile? Private recordings must be deleted separately.`)){BB.store.data.profiles=BB.store.data.profiles.filter(item=>item.id!==BB.store.data.activeProfile);BB.store.data.activeProfile=BB.store.data.profiles[0].id;BB.store.save();go("parent",{replace:true});}break;}
       case "export":go("dailyReports");break;
       case "export-raw":if(parentUnlocked)exportRawSupport();break;
@@ -2135,7 +2138,7 @@
     if(event.target.matches("[data-parent-voice-profile]")&&event.target.checked){const all=document.querySelector("[data-parent-voice-all]");if(all)all.checked=false;}
     if(event.target.matches("[data-approval-confirm],[data-approval-child]"))updateApprovalButton();
     if(event.target.matches("[data-profile-birthday]")){activeProfile().birthDate=event.target.value;BB.store.save();}
-    if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;reportProfile=event.target.value;customLoadedProfile="";BB.store.save();BB.dailyReports.startSession(event.target.value);go("parent",{replace:true});}
+    if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;reportProfile=event.target.value;customLoadedProfile="";BB.store.save();BB.dailyReports.startSession(event.target.value);BB.weeklyRewards.ensure(event.target.value);go("parent",{replace:true});}
     if(event.target.matches("[data-setting-select]")){BB.store.data.settings[event.target.dataset.settingSelect]=event.target.value;BB.store.save();}
     if(event.target.matches("[data-report-filter]")){
       const filter=event.target.dataset.reportFilter;
@@ -2155,14 +2158,19 @@
     if(!document.hidden){
       BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
       BB.dailyReports.startSession(activeProfile().id);
+      BB.weeklyRewards.ensure(activeProfile().id);
+      updateHeader();
       if(parentUnlocked&&["dailyReports","parent"].includes(route))render();
     }
   });
   window.addEventListener("pageshow",()=>{
     BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
     BB.dailyReports.startSession(activeProfile().id);
+    BB.weeklyRewards.ensure(activeProfile().id);
+    updateHeader();
   });
   window.addEventListener("bb:reward",()=>{updateHeader();if(BB.store.data.flowers)BB.memoryJourney?.track("reward","First flower grown",{icon:"🌸",onceKey:"first-flower"});if(BB.store.data.butterflies)BB.memoryJourney?.track("reward","First butterfly earned",{icon:"🦋",onceKey:"first-butterfly"});});
+  window.addEventListener("bb:weekend-bonus",event=>{updateHeader();pip(`Weekend goal complete! You earned ${event.detail?.stars||3} bonus stars!`,"🥳","Great weekend progress!");if(route==="rewards")render();});
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;});
   window.addEventListener("error",event=>{console.error(event.error);toast("Something paused. Please try that touch again.");});
 
@@ -2174,10 +2182,13 @@
   BB.parentVoices.warm();
   BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
   BB.dailyReports.startSession(activeProfile().id);
+  BB.weeklyRewards.ensure(activeProfile().id);
   setInterval(()=>{
     if(!document.hidden){
       BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
       BB.dailyReports.startSession(activeProfile().id);
+      BB.weeklyRewards.ensure(activeProfile().id);
+      updateHeader();
       BB.dailyReports.addSessionSeconds(activeProfile().id,30);
     }
   },30000);
