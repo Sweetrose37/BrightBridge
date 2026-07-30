@@ -254,7 +254,6 @@
     const id = cardIdentity(query);
     const eligible = records.filter(item => item.enabled !== false);
     const phraseKey = normalize(query.phrase);
-    const feelingKey = value => normalize(value).replace(/^(i am|i feel|im)\s+/i, "");
     const newest = items => [...items].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0] || null;
     const assigned = matches =>
       newest(matches.filter(item => item.childProfileIds?.includes(String(profileId)))) ||
@@ -267,12 +266,6 @@
       eligible.filter(item => item.categoryId === query.categoryId && item.normalizedPhrase === phraseKey),
       eligible.filter(item => item.normalizedPhrase === phraseKey)
     ];
-    if (query.categoryId === "Feelings" && phraseKey) {
-      candidateGroups.push(eligible.filter(item =>
-        ["Feelings", "Quick"].includes(item.categoryId) &&
-        feelingKey(item.phrase || item.normalizedPhrase) === feelingKey(query.phrase)
-      ));
-    }
     for (const matches of candidateGroups) {
       const record = assigned(matches);
       if (record) return record;

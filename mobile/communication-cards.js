@@ -85,6 +85,8 @@
       ["I am calming down", "😌"], ["Please wait", "⏳"], ["Stay with me", "🧑‍🤝‍🧑"]
     ],
     Feelings: [
+      ["Happy", "😊"], ["Sad", "😢"], ["Angry", "😠"], ["Calm", "😌"],
+      ["Scared", "😨"], ["Tired", "😴"], ["Excited", "🤩"], ["Frustrated", "😣"],
       ["I am happy", "😊"], ["I am sad", "😢"], ["I am angry", "😠"],
       ["I am scared", "😨"], ["I am worried", "😟"], ["I am frustrated", "😣"],
       ["I am excited", "🤩"], ["I am tired", "😴"], ["I am confused", "😕"],
