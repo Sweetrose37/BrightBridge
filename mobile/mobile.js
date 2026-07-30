@@ -381,6 +381,7 @@
   Object.assign(aac,catalogUpgrade.catalog);
   const communicationCardModel=BB_COMMUNICATION_CARDS.model(aac);
   const eligibleParentVoiceCategories=BB_COMMUNICATION_CARDS.eligibleParentVoiceCategories;
+  const communicationParentVoiceCategories=["Quick","Feelings","Sensory & Calming"];
   const quickTalk=aac.Quick;
   const spanishWords={"I want":"Quiero","I need":"Necesito","More":"Más","All done":"Terminé","Yes":"Sí","No":"No","Please":"Por favor","Thank you":"Gracias","Apple":"Manzana","Banana":"Plátano","Sandwich":"Sándwich","Crackers":"Galletas","Yogurt":"Yogur","Hungry":"Tengo hambre","Water":"Agua","Milk":"Leche","Juice":"Jugo","Thirsty":"Tengo sed","Cup":"Vaso","Bathroom":"Baño","Toilet":"Inodoro","Wash hands":"Lavar las manos","Help please":"Ayuda, por favor","Wet":"Mojado","Help":"Ayuda","Stop":"Alto","Break":"Descanso","Too loud":"Demasiado fuerte","It hurts":"Me duele","I don't know":"No sé","Happy":"Feliz","Sad":"Triste","Angry":"Enojado","Calm":"Tranquilo","Scared":"Asustado","Tired":"Cansado","Excited":"Emocionado","Mom":"Mamá","Dad":"Papá","Grandma":"Abuela","Grandpa":"Abuelo","Brother":"Hermano","Sister":"Hermana","Home":"Casa","Dog":"Perro","Cat":"Gato","Bird":"Pájaro","Fish":"Pez","Horse":"Caballo","Animal":"Animal","Teacher":"Maestro","School":"Escuela","Book":"Libro","Pencil":"Lápiz","Friend":"Amigo","My turn":"Mi turno","Doctor":"Doctor","Medicine":"Medicina","My head hurts":"Me duele la cabeza","My tummy hurts":"Me duele el estómago","Bandage":"Venda","Emergency":"Emergencia","Car":"Carro","Bus":"Autobús","Train":"Tren","Bike":"Bicicleta","Go":"Ir","Again please":"Otra vez, por favor","Look with me":"Mira conmigo","My favorite":"Mi favorito","I can read":"Puedo leer","What comes next?":"¿Qué sigue?","I need a schedule":"Necesito un horario","I have a goal":"Tengo una meta","I need more time":"Necesito más tiempo","Can you explain?":"¿Puedes explicar?","I can speak up for myself":"Puedo defenderme","I need transportation":"Necesito transporte","My future goal":"Mi meta futura"};
   const feelings=[["Happy","😊","I feel bright and happy."],["Sad","😢","I may want comfort."],["Angry","😠","I can pause and breathe."],["Calm","😌","My body feels quiet."],["Scared","😨","I can find a safe grown-up."],["Tired","😴","My body may need rest."],["Excited","🤩","I have lots of happy energy."],["Frustrated","😣","I can take a break and try later."]];
@@ -1210,6 +1211,7 @@
   function go(next,options={}){
     resetPageScroll();
     if(!options.replace&&route!==next)history.push(route);
+    if(["talkRead","talkPractice","readingLibrary"].includes(route)&&route!==next)BB.talkRead?.stop?.();
     if(next!=="communication"&&recorder?.state==="recording")stopRecording();
     BB.memoryJourney?.cancelView?.();
     BB.audio.stopMusic();
@@ -1220,7 +1222,7 @@
     render(options);
     document.querySelectorAll(".mobile-bottom-nav [data-route]").forEach(button=>{
       const navRoute=button.dataset.route;
-      button.classList.toggle("active",navRoute===route||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","dailyReports","tools","videos","videoManager","caregiverVideos","videoApprovals","parent","quickTalkVoices","parentVoiceLibrary","settings"].includes(route)));
+      button.classList.toggle("active",navRoute===route||(navRoute==="learning"&&["talkRead","talkPractice","readingLibrary"].includes(route))||(navRoute==="more"&&["music","nature","daily","social","rewards","progress","dailyReports","talkReadParent","tools","videos","videoManager","caregiverVideos","videoApprovals","parent","quickTalkVoices","parentVoiceLibrary","settings"].includes(route)));
     });
     view.focus({preventScroll:true});
     resetPageScroll();
@@ -1233,6 +1235,7 @@
       flashcards:()=>renderFlashcards(options),quiz:()=>renderQuiz(options),
       calm:renderCalm,music:renderMusic,nature:renderNature,daily:renderDaily,
       social:renderSocial,rewards:renderRewards,progress:renderProgress,dailyReports:renderDailyReports,
+      talkRead:()=>BB.talkRead.renderHub(),talkPractice:()=>BB.talkRead.renderPractice(),readingLibrary:()=>BB.talkRead.renderLibrary(),talkReadParent:()=>BB.talkRead.renderParent(),
       more:renderMore,videos:renderVideos,videoManager:renderVideoManager,
       caregiverVideos:renderCaregiverVideoRequests,videoApprovals:renderParentVideoApprovals,
       tools:()=>BB.mobileTools.render(),parent:renderParent,quickTalkVoices:renderQuickTalkVoices,parentVoiceLibrary:renderParentVoiceLibrary,settings:renderSettings,
@@ -1253,6 +1256,7 @@
     if(route==="flashcards"&&currentGame?.id==="tracing")setupTracing();
     if(route==="tools")BB.mobileTools.afterRender();
     if(route==="memory")BB.memoryJourney.open(options.section||"hub",{withinRoute:true});
+    BB.talkRead?.afterRender?.(route);
   }
 
   function renderHome(){
@@ -1264,7 +1268,8 @@
       ["daily","🚪","Daily Living","Practice familiar routines","#e5f2ff"],
       ["music","🎹","Music","Play notes and discover sounds","#fff0c9"],
       ["nature","🦋","Nature","Explore animals, gardens, oceans, and space","#ddf5ed"],
-      ["videos","📺","Approved Videos","Only videos chosen by a grown-up","#fce2f0"]
+      ["videos","📺","Approved Videos","Only videos chosen by a grown-up","#fce2f0"],
+      ["talkRead","🗣️","Learn to Talk & Read","Speech practice and interactive stories","#e8f7ef"]
     ];
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
@@ -1348,7 +1353,7 @@
     ];
     return `<section>${pageHead("Parent Card Voices","One protected recorder for Quick Talk, Feelings, and Calm & Sensory.","parent")}
       <div class="mobile-panel"><h3>🔒 Private and local</h3><p>Recordings stay on this device. The microphone is requested only after you choose Record. Each clip may be up to 15 seconds.</p><button class="mobile-button secondary" type="button" data-route="parentVoiceLibrary">Open Parent Voice Library</button></div>
-      <div class="mobile-category-row">${eligibleParentVoiceCategories.map(name=>`<button class="mobile-chip ${parentVoiceCategory===name?"active":""}" type="button" data-parent-voice-category="${esc(name)}">${name==="Sensory & Calming"?"Calm & Sensory":esc(name)}</button>`).join("")}</div>
+      <div class="mobile-category-row">${communicationParentVoiceCategories.map(name=>`<button class="mobile-chip ${parentVoiceCategory===name?"active":""}" type="button" data-parent-voice-category="${esc(name)}">${name==="Sensory & Calming"?"Calm & Sensory":esc(name)}</button>`).join("")}</div>
       <p class="muted">${cards.length} audio-enabled ${parentVoiceCategory==="Sensory & Calming"?"Calm & Sensory":esc(parentVoiceCategory)} cards. Future cards in this category appear automatically.</p>
       <div class="mobile-parent-voice-grid">${cards.map(({phrase,icon,cardId})=>{const records=parentVoiceRecords.filter(record=>record.cardId===cardId),record=records[0];return `<article class="mobile-parent-voice-card"><span>${icon}</span><div><strong>${esc(phrase)}</strong><small>${records.length?`✓ Parent Voice Added${records.length>1?` · ${records.length} profile voices`:""} · ${esc(parentVoiceAssignments(record))}`:"Uses the existing voice fallback"}</small></div><button class="mobile-button" type="button" data-parent-voice-edit="${esc(phrase)}" data-parent-voice-card-id="${esc(cardId)}" data-parent-voice-card-category="${esc(parentVoiceCategory)}" ${record?`data-parent-voice-recording-id="${esc(record.recordingId)}"`:""}>${record?"Manage voice":"Add voice"}</button>${record?`<button class="compact-button" type="button" data-parent-voice-preview="${esc(record.recordingId)}" aria-label="Preview ${esc(phrase)}">▶</button><button class="mobile-button secondary" type="button" data-parent-voice-edit="${esc(phrase)}" data-parent-voice-card-id="${esc(cardId)}" data-parent-voice-card-category="${esc(parentVoiceCategory)}">＋ Another profile voice</button>`:""}</article>`;}).join("")}</div>
     </section>`;
@@ -1384,7 +1389,7 @@
   }
 
   function voiceEditorContent(phrase,record){
-    const profiles=BB.store.data.profiles,all=record?.childProfileIds?.includes("*")||false;
+    const profiles=BB.store.data.profiles,all=record?.childProfileIds?.includes("*")||false,clipLimit=parentVoiceClipLimit();
     return `<div class="mobile-modal-head"><h2>🎙️ ${esc(phrase)}</h2><button class="mobile-close" type="button" data-action="parent-voice-cancel">×</button></div>
       <p><strong>Record a short, clear phrase for this communication card.</strong></p><p>Exact card phrase: “${esc(phrase)}”</p><p>Recording starts only after a 3-second countdown and never saves until you tap Save Voice.</p>
       <div class="mobile-recording-status" data-parent-record-status>${stagedParentVoice?`Ready to preview · ${Math.round(stagedParentVoiceDuration)} seconds`:(record?"Current parent voice is ready.":"No parent voice added yet.")}</div>
@@ -1399,7 +1404,7 @@
         <label><input type="checkbox" data-parent-voice-all ${all?"checked":""}><span>All child profiles</span></label>
         ${profiles.map(profile=>`<label><input type="checkbox" data-parent-voice-profile="${esc(profile.id)}" ${!all&&(record?.childProfileIds?.includes(profile.id)||(!record&&profile.id===activeProfile().id))?"checked":""}><span>${profile.avatar||"🌟"} ${esc(profile.name)}</span></label>`).join("")}
       </fieldset>
-      <p class="muted">Accepted uploads: MP3, M4A, WAV, or AAC; maximum 15 seconds and 12 MB. Files stay in private device storage.</p>
+      <p class="muted">Accepted uploads: MP3, M4A, WAV, or AAC; maximum ${clipLimit} seconds and 12 MB. Files stay in private device storage.</p>
       <div class="mobile-button-row"><button class="mobile-button" type="button" data-action="parent-voice-save" ${stagedParentVoice?"":"disabled"}>Save Voice</button>${record?'<button class="mobile-button secondary" type="button" data-action="parent-voice-restore">Remove & Restore Default Voice</button>':""}<button class="mobile-button secondary" type="button" data-action="parent-voice-cancel">Cancel</button></div>`;
   }
 
@@ -1412,12 +1417,21 @@
     if(recordingId){
       try{record=await BB.parentVoices.getForParent(parentVoiceActor,{recordingId});}
       catch(error){toast(error.message||"The saved voice could not be opened. You can still record a replacement.");}
+    }else if(editingParentVoiceCardId){
+      try{record=await BB.parentVoices.getForParent(parentVoiceActor,{cardId:editingParentVoiceCardId,categoryId:cardCategory,phrase});}
+      catch(error){toast(error.message||"The saved voice could not be opened. You can still record a replacement.");}
     }
+    if(record){editingParentVoiceRecordingId=record.recordingId;editingParentVoiceCardId=record.cardId||editingParentVoiceCardId;}
     editingParentVoiceRecord=record;
     stagedParentVoice=record?.blob||null;
     stagedParentVoiceDuration=record?.duration||0;
     stagedParentVoiceSource=record?.audioSource||"recording";
     modal(voiceEditorContent(phrase,record),`Parent voice for ${phrase}`);
+  }
+
+  function parentVoiceClipLimit(){
+    if(editingParentVoiceCategory!=="Book Narration")return 15;
+    return editingParentVoiceCardId.endsWith(":full:full")?180:45;
   }
 
   function updateParentRecordStatus(message){
@@ -1439,7 +1453,7 @@
       parentVoiceRecorder.addEventListener("dataavailable",event=>{if(event.data.size)parentVoiceChunks.push(event.data);});
       parentVoiceRecorder.addEventListener("stop",()=>{
         if(cancelParentVoiceCapture){parentVoiceStream?.getTracks().forEach(track=>track.stop());parentVoiceStream=null;return;}
-        const duration=Math.min(15,(Date.now()-parentVoiceStartedAt)/1000);
+        const clipLimit=parentVoiceClipLimit(),duration=Math.min(clipLimit,(Date.now()-parentVoiceStartedAt)/1000);
         const blob=new Blob(parentVoiceChunks,{type:parentVoiceRecorder.mimeType||"audio/webm"});
         parentVoiceStream?.getTracks().forEach(track=>track.stop());parentVoiceStream=null;
         if(!blob.size){toast("The recording was empty. Please try again.");modal(voiceEditorContent(editingParentVoicePhrase,editingParentVoiceRecord),`Parent voice for ${editingParentVoicePhrase}`);return;}
@@ -1452,9 +1466,9 @@
       stopButton.className="mobile-button danger";stopButton.type="button";stopButton.dataset.action="parent-record-stop";stopButton.textContent="■ Stop recording";
       document.querySelector(".mobile-parent-recorder-actions")?.append(stopButton);
       parentVoiceTimer=setInterval(()=>{
-        const elapsed=Math.min(15,(Date.now()-parentVoiceStartedAt)/1000);
+        const clipLimit=parentVoiceClipLimit(),elapsed=Math.min(clipLimit,(Date.now()-parentVoiceStartedAt)/1000);
         updateParentRecordStatus(`Recording… ${Math.floor(elapsed)} seconds`);
-        if(elapsed>=15)stopParentVoiceRecording();
+        if(elapsed>=clipLimit)stopParentVoiceRecording();
       },250);
     }catch(error){
       parentVoiceStream?.getTracks().forEach(track=>track.stop());parentVoiceStream=null;
@@ -1490,7 +1504,8 @@
     if(!file.size||file.size>12*1024*1024){toast("Choose a non-empty audio file smaller than 12 MB.");input.value="";return;}
     try{
       const duration=await audioDuration(file);
-      if(duration>15.05){toast("Choose an audio clip that is 15 seconds or shorter.");input.value="";return;}
+      const clipLimit=parentVoiceClipLimit();
+      if(duration>clipLimit+.05){toast(`Choose an audio clip that is ${clipLimit} seconds or shorter.`);input.value="";return;}
       stagedParentVoice=file;stagedParentVoiceDuration=duration;stagedParentVoiceSource="upload";
       modal(voiceEditorContent(editingParentVoicePhrase,editingParentVoiceRecord),`Parent voice for ${editingParentVoicePhrase}`);
       toast("Audio is ready to preview. Tap Save Voice when it sounds right.");
@@ -1507,7 +1522,11 @@
       const savedPhrase=editingParentVoicePhrase;
       await BB.parentVoices.save(parentVoiceActor,{recordingId:editingParentVoiceRecordingId,cardId:editingParentVoiceCardId,categoryId:editingParentVoiceCategory,phrase:editingParentVoicePhrase,blob:stagedParentVoice,source:stagedParentVoiceSource,duration:stagedParentVoiceDuration,allProfiles:all,profileIds});
       await loadParentVoices();
-      closeParentVoiceEditor();view.innerHTML=route==="parentVoiceLibrary"?renderParentVoiceLibrary():renderQuickTalkVoices();toast(`Parent voice saved for “${savedPhrase}”`);
+      closeParentVoiceEditor();
+      if(route==="parentVoiceLibrary")view.innerHTML=renderParentVoiceLibrary();
+      else if(route==="talkReadParent"){view.innerHTML=BB.talkRead.renderParent();BB.talkRead.afterRender(route);}
+      else view.innerHTML=renderQuickTalkVoices();
+      toast(`Parent voice saved for “${savedPhrase}”`);
     }catch(error){toast(error.message||"That parent voice could not be saved.");if(saveButton){saveButton.disabled=false;saveButton.textContent="Save Voice";}}
   }
 
@@ -1518,6 +1537,7 @@
   function renderLearning(){
     const stage=BB.store.data.profiles.find(item=>item.id===BB.store.data.activeProfile)?.growthPath?.stage||"early-explorer",limits={"early-explorer":10,"growing-learner":16,"independent-communicator":20,"teen-young-adult":26},ids=learningIds.slice(0,BB.store.data.settings.simpleMode?8:limits[stage]||20);
     return `<section>${pageHead("Learning Adventures","Choose cards to explore or play a gentle challenge.")}
+      <button class="mobile-talk-read-launch" type="button" data-route="talkRead"><span>🗣️📚</span><div><strong>Learn to Talk & Read</strong><small>Practice communication or open an interactive book</small></div><b>›</b></button>
       <div class="mobile-list">${ids.map(id=>{const game=BB.games[id];return `<article class="mobile-list-card" style="--soft:${game.color}"><span>${game.icon}</span><div><strong>${esc(game.title)}</strong><small>${esc(game.description)}</small></div><div><button class="mobile-button secondary" type="button" data-cards="${id}">Cards</button><button class="mobile-button" type="button" data-play="${id}">Play</button></div></article>`;}).join("")}</div>
     </section>`;
   }
@@ -1633,7 +1653,7 @@
     const topCategory=BB.dailyReports.topEntries(report.communicationCategoryCounts||{},[],1)[0]?.[0]||"No activity recorded";
     const videoCount=Object.values(report.videosViewed||{}).reduce((sum,count)=>sum+count,0);
     const notes=[...(report.caregiverNotes||[]),...(report.parentNotes||[])];
-    const empty=!report.totalCardTaps&&!report.totalSessionSeconds&&!videoCount&&!report.starsEarned;
+    const empty=!report.totalCardTaps&&!report.totalSessionSeconds&&!videoCount&&!report.starsEarned&&!Object.keys(report.talkLessonsOpened||{}).length&&!Object.keys(report.readingBooksOpened||{}).length;
     return `<article class="mobile-daily-report ${report.reviewed?"is-reviewed":""}" data-report-card="${esc(report.reportDate)}">
       <div class="mobile-report-heading"><div><small>${esc(BB.dailyReports.profileName(report.childProfileId))}</small><h2>${esc(reportDateLabel(report.reportDate))}</h2></div><span>${report.finalizedAt?"Archived":"Live today"}</span></div>
       ${empty?'<div class="mobile-report-empty">No app activity was recorded for this day.</div>':`
@@ -1641,6 +1661,7 @@
       <div class="mobile-report-totals"><div><strong>${report.totalAppSessions||0}</strong><span>Sessions</span></div><div><strong>${Math.round((report.totalSessionSeconds||0)/60)}m</strong><span>App time</span></div><div><strong>${report.totalCardTaps||0}</strong><span>Card selections</span></div><div><strong>${(report.uniqueCardKeys||[]).length}</strong><span>Different cards</span></div><div><strong>⭐ ${report.starsEarned||0}</strong><span>Stars collected</span></div></div>
       <details><summary>Communication details</summary><h3>Most active category</h3><p>${esc(topCategory)}</p><h3>Most used communications</h3>${topPhrases.length?`<ol>${topPhrases.map(([phrase,count])=>`<li><span>“${esc(phrase)}” — ${count} ${count===1?"time":"times"}</span><button type="button" data-report-exclude="${esc(phrase)}" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Exclude accidental tap</button></li>`).join("")}</ol>`:'<p class="muted">No activity recorded</p>'}<h3>Feelings communicated</h3>${renderReportMap(report.feelingsSelected)}<h3>Needs communicated</h3>${renderReportMap(report.needsCommunicated)}<h3>Calm and sensory support</h3>${renderReportMap(report.calmStrategiesUsed)}</details>
       <details><summary>Rewards, voice, videos, and learning</summary><div class="mobile-report-readable-list"><p><strong>Stars collected:</strong> ${report.starsEarned||0}</p>${report.weekendBonusStars?`<p><strong>Weekend incentive bonus:</strong> ${report.weekendBonusStars} stars</p>`:""}<p><strong>Parent-recorded voice cards:</strong> ${report.parentVoiceUsageCount||0}</p><p><strong>Default voice cards:</strong> ${report.defaultVoiceUsageCount||0}</p><p><strong>Text-to-speech fallback:</strong> ${report.textToSpeechUsageCount||0}</p><p><strong>Videos watched:</strong> ${videoCount}</p><p><strong>Video time:</strong> ${Math.round((report.videoSeconds||0)/60)} minutes</p><p><strong>Goals completed:</strong> ${Object.values(report.goalsCompleted||{}).reduce((sum,count)=>sum+count,0)}</p></div></details>`}
+      <details><summary>Learn to Talk & Read</summary><div class="mobile-report-readable-list"><h3>Speech and communication practice</h3><p><strong>Lessons opened:</strong> ${Object.values(report.talkLessonsOpened||{}).reduce((sum,count)=>sum+count,0)}</p><p><strong>Sounds practiced:</strong> ${Object.keys(report.soundsPracticed||{}).length}</p><p><strong>Words practiced:</strong> ${Object.keys(report.wordsPracticed||{}).length}</p><p><strong>Phrases practiced:</strong> ${Object.keys(report.phrasesPracticed||{}).length}</p><p><strong>Repeat After Me turns:</strong> ${report.talkRepeatTurns||0}</p><p><strong>Picture or communication-card responses:</strong> ${(report.talkPictureResponses||0)+(report.talkCommunicationResponses||0)}</p><p><strong>Parent voice prompts:</strong> ${report.talkParentVoicePrompts||0}</p><h3>Reading activity</h3><p><strong>Books opened:</strong> ${Object.values(report.readingBooksOpened||{}).reduce((sum,count)=>sum+count,0)}</p><p><strong>Books completed:</strong> ${Object.values(report.readingBooksCompleted||{}).reduce((sum,count)=>sum+count,0)}</p><p><strong>Pages viewed:</strong> ${report.readingPagesViewed||0}</p><p><strong>Reading time:</strong> ${Math.round((report.readingSeconds||0)/60)} minutes</p><p><strong>Repeat After Me prompts:</strong> ${report.readingRepeatTurns||0}</p><p><strong>Parent-narrated pages:</strong> ${report.readingParentNarratedPages||0}</p></div></details>
       ${report.safetyEvents?.length?`<div class="mobile-report-safety"><h3>Safety information</h3>${report.safetyEvents.map(item=>`<p>“${esc(item.phrase)}” — ${new Date(item.timestamp).toLocaleString()}</p>`).join("")}</div>`:""}
       <details open><summary>Parent notes</summary><div class="mobile-report-notes">${(report.caregiverNotes||[]).map(note=>`<p>${esc(note.text)}<small>${esc(note.role||"Caregiver")} · ${new Date(note.timestamp).toLocaleString()}</small></p>`).join("")}${(report.parentNotes||[]).map((note,index)=>`<p>${esc(note.text)}<small>${esc(note.role||"Parent or guardian")} · ${new Date(note.timestamp).toLocaleString()}${note.editedAt?" · corrected":""}</small><button type="button" data-report-note-edit="${index}" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Correct note</button></p>`).join("")||(!notes.length?'<p class="muted">No notes added</p>':"")}</div><label class="mobile-tool-label"><span>Add a private parent note</span><textarea data-report-note="${esc(report.reportDate)}" data-report-note-profile="${esc(report.childProfileId)}" maxlength="1000" placeholder="Add a factual note for this day"></textarea></label><button class="mobile-button secondary" type="button" data-report-note-save="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Save note</button></details>
       <div class="mobile-report-actions"><button class="mobile-button secondary" type="button" data-report-reviewed="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">${report.reviewed?"✓ Reviewed":"Mark reviewed"}</button><button class="mobile-button" type="button" data-report-export="print" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Print / Save PDF</button><button class="mobile-button secondary" type="button" data-report-export="text" data-report-date="${esc(report.reportDate)}" data-report-profile="${esc(report.childProfileId)}">Plain text</button></div>
@@ -1715,7 +1736,7 @@
         </details>
       </div>
       <div class="mobile-profile-actions"><button class="mobile-button secondary" type="button" data-action="add-profile"><span>➕</span><strong>Add another profile</strong><small>Create a separate private journey</small></button><button class="mobile-button secondary" type="button" data-route="quickTalkVoices"><span>🎙️</span><strong>Parent Card Voices</strong><small>Quick Talk, Feelings, and Calm & Sensory</small></button><button class="mobile-button secondary" type="button" data-route="parentVoiceLibrary"><span>🎧</span><strong>Parent Voice Library</strong><small>Search, filter, and manage private card voices</small></button><button class="mobile-button secondary" type="button" data-route="communication"><span>💬</span><strong>All Communication Cards</strong><small>Manage custom cards and existing family voices</small></button></div>
-      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button" type="button" data-route="dailyReports">📊 Daily Reports</button><button class="mobile-button secondary" type="button" data-route="videoApprovals">📨 Video Approval Requests</button><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
+      <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button" type="button" data-route="dailyReports">📊 Daily Reports</button><button class="mobile-button secondary" type="button" data-route="talkReadParent">🗣️ Learn to Talk & Read Settings</button><button class="mobile-button secondary" type="button" data-route="videoApprovals">📨 Video Approval Requests</button><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
     </section>`;
   }
 
@@ -1823,7 +1844,7 @@
     catch{toast("That audio file could not be saved.");}
   }
 
-  async function speakExact(text,cardCategory="",cardId="",dailyEventId="",legacyAliases=[]){
+  async function speakExact(text,cardCategory="",cardId="",dailyEventId="",legacyAliases=[],rateOverride=null){
     const generation=++speechGeneration;
     BB.speech.stop();BB.parentVoices.stop();window.speechSynthesis?.cancel();
     const eligible=BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory);
@@ -1834,30 +1855,31 @@
       customPlayed=await BB.parentVoices.playBlob(cachedRecord.blob,BB.store.data.settings.speechVolume);
     }else if(eligible){
       parentRecord=await BB.parentVoices.getForChild(voiceDetails,activeProfile().id);
-      if(generation!==speechGeneration)return;
+      if(generation!==speechGeneration)return "cancelled";
       customPlayed=parentRecord?await BB.parentVoices.playBlob(parentRecord.blob,BB.store.data.settings.speechVolume):false;
     }
-    if(generation!==speechGeneration)return;
-    if(customPlayed){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"parent");return;}
+    if(generation!==speechGeneration)return "cancelled";
+    if(customPlayed){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"parent");return "parent";}
     const played=await BB.speech.speak(text);
-    if(generation!==speechGeneration){BB.speech.stop();return;}
-    if(played){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"default");return;}
+    if(generation!==speechGeneration){BB.speech.stop();return "cancelled";}
+    if(played){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"default");return "default";}
     for(const alias of legacyAliases){
       const legacyPlayed=await BB.voiceLibrary.play(alias,BB.store.data.settings.speechVolume);
-      if(generation!==speechGeneration){BB.voiceLibrary.stop();return;}
-      if(legacyPlayed){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"parent");return;}
+      if(generation!==speechGeneration){BB.voiceLibrary.stop();return "cancelled";}
+      if(legacyPlayed){if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"parent");return "parent";}
     }
     if(BB.store.data.settings.speech&&"speechSynthesis" in window&&"SpeechSynthesisUtterance" in window){
       const utterance=new SpeechSynthesisUtterance(text);
       utterance.lang=BB.store.data.settings.language||"en-US";
-      utterance.rate=Math.max(.6,Math.min(1.25,BB.store.data.settings.speechRate||.86));
+      utterance.rate=Math.max(.6,Math.min(1.25,rateOverride||BB.store.data.settings.speechRate||.86));
       utterance.volume=Math.max(0,Math.min(1,BB.store.data.settings.speechVolume||.9));
       window.speechSynthesis.speak(utterance);
       if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"text-to-speech");
-      return;
+      return "text-to-speech";
     }
     if(dailyEventId)BB.dailyReports.markVoice(activeProfile().id,dailyEventId,"visual");
     toast(`No voice is available right now for “${text}”`);
+    return "visual";
   }
 
   function answerQuiz(index){
@@ -1951,6 +1973,7 @@
   }
 
   function handleClick(event){
+    if(BB.talkRead?.ownsEvent?.(event)){BB.talkRead.handleClick(event);return;}
     const routeButton=event.target.closest("[data-route]");
     if(routeButton){go(routeButton.dataset.route);return;}
     const reportViewButton=event.target.closest("[data-report-view]");
@@ -2078,7 +2101,7 @@
       case "parent-preview-stop":BB.parentVoices.stop();break;
       case "parent-voice-save":saveStagedParentVoice();break;
       case "parent-voice-cancel":closeParentVoiceEditor();break;
-      case "parent-voice-restore":if(parentVoiceActor&&editingParentVoicePhrase&&confirm("Remove this parent voice and restore the existing voice fallback?"))BB.parentVoices.remove(parentVoiceActor,editingParentVoiceRecordingId?{recordingId:editingParentVoiceRecordingId}:{cardId:editingParentVoiceCardId,categoryId:editingParentVoiceCategory,phrase:editingParentVoicePhrase}).then(()=>loadParentVoices()).then(()=>{closeParentVoiceEditor();view.innerHTML=route==="parentVoiceLibrary"?renderParentVoiceLibrary():renderQuickTalkVoices();toast("Existing voice fallback restored.");});break;
+      case "parent-voice-restore":if(parentVoiceActor&&editingParentVoicePhrase&&confirm("Remove this parent voice and restore the existing voice fallback?"))BB.parentVoices.remove(parentVoiceActor,editingParentVoiceRecordingId?{recordingId:editingParentVoiceRecordingId}:{cardId:editingParentVoiceCardId,categoryId:editingParentVoiceCategory,phrase:editingParentVoicePhrase}).then(()=>loadParentVoices()).then(()=>{closeParentVoiceEditor();if(route==="parentVoiceLibrary")view.innerHTML=renderParentVoiceLibrary();else if(route==="talkReadParent"){view.innerHTML=BB.talkRead.renderParent();BB.talkRead.afterRender(route);}else view.innerHTML=renderQuickTalkVoices();toast("Existing voice fallback restored.");});break;
       case "video-form-preview":previewVideoForm();break;
       case "video-save":saveVideoFromForm();break;
       case "video-cancel-edit":editingVideoId="";view.innerHTML=renderVideoManager();resetPageScroll();break;
@@ -2106,17 +2129,18 @@
       case "save-pin":{const value=document.querySelector("[data-new-pin]")?.value;if(/^\d{4}$/.test(value)){BB.store.data.settings.parentPin=value;BB.store.save();closeModal();toast("Parent PIN changed");}else toast("Use exactly four numbers.");break;}
       case "lock-parent":BB.videoApprovals.closeParent(parentVideoActor);BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;parentUnlocked=false;toast("Grown-up Area locked");go("more",{replace:true});break;
       case "install":if(installPrompt){installPrompt.prompt();installPrompt.userChoice.finally(()=>installPrompt=null);}else modal(`<div class="mobile-modal-head"><h2>Install BrightBridge</h2><button class="mobile-close" type="button" data-action="close-modal">×</button></div><p>Open your browser menu and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.</p><button class="mobile-button" type="button" data-action="close-modal">Got it</button>`,"Install BrightBridge");break;
-      case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();reportProfile=profile.id;BB.dailyReports.startSession(profile.id);BB.weeklyRewards.ensure(profile.id);go("parent",{replace:true});break;}
+      case "add-profile":{const name=prompt("Child's display name:")?.trim();if(!name)break;const profile={id:`child-${Date.now()}`,name:name.slice(0,30),avatar:"🌟",birthDate:""};BB.store.data.profiles.push(profile);BB.store.data.activeProfile=profile.id;BB.store.save();reportProfile=profile.id;BB.dailyReports.startSession(profile.id);BB.weeklyRewards.ensure(profile.id);BB.talkRead?.refreshProfile?.();go("parent",{replace:true});break;}
       case "delete-profile":{if(BB.store.data.profiles.length<2)break;if(confirm(`Delete ${activeProfile().name}'s profile? Private recordings must be deleted separately.`)){BB.store.data.profiles=BB.store.data.profiles.filter(item=>item.id!==BB.store.data.activeProfile);BB.store.data.activeProfile=BB.store.data.profiles[0].id;BB.store.save();go("parent",{replace:true});}break;}
       case "export":go("dailyReports");break;
       case "export-raw":if(parentUnlocked)exportRawSupport();break;
-      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),parentVoiceActor?BB.parentVoices.clear(parentVoiceActor):Promise.resolve(),BB.memoryJourney.clear(),clearCustomCards()]).finally(()=>{if(parentVideoActor)BB.videoApprovals.clear(parentVideoActor);clearApprovedVideos();BB.store.reset();BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;caregiverActor=null;parentUnlocked=false;go("home");});break;
+      case "reset":if(confirm("Reset all BrightBridge progress and private memories on this device?"))Promise.all([BB.voiceLibrary.clear(),parentVoiceActor?BB.parentVoices.clear(parentVoiceActor):Promise.resolve(),BB.memoryJourney.clear(),clearCustomCards(),BB.talkReadStorage?.clearAll?.()||Promise.resolve()]).finally(()=>{if(parentVideoActor)BB.videoApprovals.clear(parentVideoActor);clearApprovedVideos();BB.store.reset();BB.parentVoices.close(parentVoiceActor);parentVideoActor=null;parentVoiceActor=null;caregiverActor=null;parentUnlocked=false;go("home");});break;
       case "close-modal":closeModal();break;
       case "modal-overlay":if(event.target===action)closeModal();break;
     }
   }
 
   function handleInput(event){
+    if(BB.talkRead?.ownsEvent?.(event)){BB.talkRead.handleInput(event);return;}
     if(event.target.matches("[data-pin]"))updatePin();
     if(event.target.matches("[data-sentence]"))sentence=event.target.value;
     if(event.target.matches("[data-profile-name]")){const profile=activeProfile();profile.name=event.target.value;BB.store.save();}
@@ -2136,6 +2160,7 @@
   }
 
   function handleChange(event){
+    if(BB.talkRead?.ownsEvent?.(event)){BB.talkRead.handleChange(event);return;}
     if(event.target.matches("[data-upload-card]"))uploadVoice(event.target);
     if(event.target.matches("[data-parent-voice-upload]"))stageParentVoiceUpload(event.target);
     if(event.target.matches("[data-parent-voice-filter]")){const filter=event.target.dataset.parentVoiceFilter;if(filter==="category")parentVoiceLibraryCategory=event.target.value;if(filter==="profile")parentVoiceLibraryProfile=event.target.value;if(filter==="source")parentVoiceLibrarySource=event.target.value;view.innerHTML=renderParentVoiceLibrary();}
@@ -2143,7 +2168,7 @@
     if(event.target.matches("[data-parent-voice-profile]")&&event.target.checked){const all=document.querySelector("[data-parent-voice-all]");if(all)all.checked=false;}
     if(event.target.matches("[data-approval-confirm],[data-approval-child]"))updateApprovalButton();
     if(event.target.matches("[data-profile-birthday]")){activeProfile().birthDate=event.target.value;BB.store.save();}
-    if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;reportProfile=event.target.value;customLoadedProfile="";BB.store.save();BB.dailyReports.startSession(event.target.value);BB.weeklyRewards.ensure(event.target.value);go("parent",{replace:true});}
+    if(event.target.matches("[data-profile]")){BB.store.data.activeProfile=event.target.value;reportProfile=event.target.value;customLoadedProfile="";BB.store.save();BB.dailyReports.startSession(event.target.value);BB.weeklyRewards.ensure(event.target.value);BB.talkRead?.refreshProfile?.();go("parent",{replace:true});}
     if(event.target.matches("[data-setting-select]")){BB.store.data.settings[event.target.dataset.settingSelect]=event.target.value;BB.store.save();}
     if(event.target.matches("[data-report-filter]")){
       const filter=event.target.dataset.reportFilter;
@@ -2160,6 +2185,7 @@
   document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal();if(event.key==="Enter"&&event.target.matches("[data-pin]"))verifyPin();});
   document.addEventListener("visibilitychange",()=>{
     if(document.hidden&&parentVoiceRecorder?.state==="recording")stopParentVoiceRecording();
+    if(document.hidden)BB.talkRead?.pauseForBackground?.();
     if(!document.hidden){
       BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
       BB.dailyReports.startSession(activeProfile().id);
@@ -2181,9 +2207,24 @@
 
   window.BB=window.BB||{};
   BB.navigation={go,back:()=>go(history.pop()||"home",{replace:true}),pageHead,get current(){return route;}};
-  BB.app={render:(next,options)=>{route=next;render(options);},pip,modal,closeModal,toast,isParentUnlocked:()=>parentUnlocked};
+  BB.app={
+    render:(next,options)=>{route=next;render(options);},
+    pip,modal,closeModal,toast,
+    isParentUnlocked:()=>parentUnlocked,
+    speakTeaching:(text,cardCategory="",cardId="",dailyEventId="",options={})=>speakExact(text,cardCategory,cardId,dailyEventId,[],options.rate),
+    stopTeachingAudio:()=>{speechGeneration++;BB.speech.stop();BB.parentVoices.stop();BB.voiceLibrary.stop();window.speechSynthesis?.cancel();},
+    pauseTeachingAudio:()=>{const parentPaused=BB.parentVoices.pause(),libraryPaused=BB.voiceLibrary.pause(),ttsPaused=Boolean(window.speechSynthesis?.speaking&&!window.speechSynthesis.paused&&(window.speechSynthesis.pause(),true));return Boolean(parentPaused||libraryPaused||ttsPaused);},
+    resumeTeachingAudio:async()=>Boolean((await BB.parentVoices.resume())||(await BB.voiceLibrary.resume())||(window.speechSynthesis?.paused&&(window.speechSynthesis.resume(),true))),
+    openParentVoiceEditor,
+    listParentVoices:async categoryId=>{
+      if(!parentVoiceActor)return [];
+      const records=await BB.parentVoices.list(parentVoiceActor);
+      return categoryId?records.filter(record=>record.categoryId===categoryId):records;
+    }
+  };
   BB.communicationCatalog={cards:communicationCardModel,duplicateReport:catalogUpgrade.report,findDuplicate:(phrase,cardCategory)=>BB_COMMUNICATION_CARDS.findDuplicate(phrase,cardCategory,aac,customCards)};
   BB.accessibility.apply();
+  BB.talkRead?.init?.();
   BB.parentVoices.warm();
   BB.dailyReports.checkRollover(BB.store.data.profiles.map(profile=>profile.id));
   BB.dailyReports.startSession(activeProfile().id);

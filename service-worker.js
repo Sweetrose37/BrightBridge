@@ -1,4 +1,4 @@
-const CACHE = "brightbridge-v37";
+const CACHE = "brightbridge-v38";
 const CORE = [
   "./",
   "./index.html",
@@ -11,6 +11,9 @@ const CORE = [
   "./mobile/parent-voices.js",
   "./mobile/daily-reports.js",
   "./mobile/weekly-rewards.js",
+  "./mobile/talk-read-data.js",
+  "./mobile/talk-read-storage.js",
+  "./mobile/talk-read.js",
   "./mobile/approved-videos.js",
   "./mobile/video-approvals.js",
   "./mobile/mobile-tools.js",

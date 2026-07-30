@@ -314,7 +314,11 @@
   }
 
   function pause() {
-    if (activeAudio && !activeAudio.paused) activeAudio.pause();
+    if (activeAudio && !activeAudio.paused) {
+      activeAudio.pause();
+      return true;
+    }
+    return false;
   }
 
   async function resume() {

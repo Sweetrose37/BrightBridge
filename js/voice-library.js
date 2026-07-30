@@ -146,6 +146,24 @@
     cleanupActive();
   }
 
+  function pause() {
+    if (activeAudio && !activeAudio.paused) {
+      activeAudio.pause();
+      return true;
+    }
+    return false;
+  }
+
+  async function resume() {
+    if (!activeAudio || !activeAudio.paused) return false;
+    try {
+      await activeAudio.play();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function startRecord(record, volume = 1) {
     cleanupActive();
     activeUrl = URL.createObjectURL(record.blob);
@@ -228,5 +246,5 @@
   }
 
   window.BB = window.BB || {};
-  BB.voiceLibrary = { normalize, save, get, list, remove, clear, exportAll, importAll, play, stop, sequenceFor };
+  BB.voiceLibrary = { normalize, save, get, list, remove, clear, exportAll, importAll, play, stop, pause, resume, sequenceFor };
 })();

@@ -77,6 +77,26 @@
       starsEarned: 0,
       starReasons: {},
       weekendBonusStars: 0,
+      talkLessonsOpened: {},
+      soundsPracticed: {},
+      wordsPracticed: {},
+      phrasesPracticed: {},
+      talkRepeatTurns: 0,
+      talkCommunicationResponses: 0,
+      talkPictureResponses: 0,
+      talkRecorderTurns: 0,
+      talkParentVoicePrompts: 0,
+      talkSkipped: 0,
+      readingBooksOpened: {},
+      readingBooksCompleted: {},
+      readingPagesViewed: 0,
+      readingSeconds: 0,
+      readingFavoriteBooks: {},
+      readingModeCounts: {},
+      readingRepeatTurns: 0,
+      readingCommunicationResponses: 0,
+      readingRecorderTurns: 0,
+      readingParentNarratedPages: 0,
       caregiverNotes: [],
       parentNotes: [],
       safetyEvents: [],
@@ -213,6 +233,47 @@
     BB.store.save();
   }
 
+  function recordTalk(profileId, details = {}, value = new Date()) {
+    const report = ensureDay(profileId, value, false);
+    if (!report) return;
+    if (details.lessonsOpened) addCount(report.talkLessonsOpened, details.lesson || "Talking practice", Number(details.lessonsOpened));
+    if (details.prompt) {
+      const amount = Number(details.listened || 1);
+      if (details.kind === "sound") addCount(report.soundsPracticed, details.prompt, amount);
+      else if (details.kind === "word") addCount(report.wordsPracticed, details.prompt, amount);
+      else addCount(report.phrasesPracticed, details.prompt, amount);
+    }
+    report.talkRepeatTurns += Number(details.repeatTurns || 0);
+    report.talkCommunicationResponses += Number(details.communicationResponses || 0);
+    report.talkPictureResponses += Number(details.pictureResponses || 0);
+    report.talkRecorderTurns += Number(details.usedRecorder || 0);
+    report.talkParentVoicePrompts += Number(details.parentVoicePrompts || 0);
+    report.talkSkipped += Number(details.skipped || 0);
+    touch(report, "talk-practice", details.prompt || details.lesson || "Talking practice");
+    BB.store.save();
+  }
+
+  function recordReading(profileId, details = {}, value = new Date()) {
+    const report = ensureDay(profileId, value, false);
+    if (!report) return;
+    if (details.booksOpened) addCount(report.readingBooksOpened, details.bookTitle || "Book", Number(details.booksOpened));
+    if (details.booksCompleted) addCount(report.readingBooksCompleted, details.bookTitle || "Book", Number(details.booksCompleted));
+    report.readingPagesViewed += Number(details.pagesViewed || 0);
+    report.readingSeconds += Number(details.readingSeconds || 0);
+    if (details.favoriteBook) addCount(report.readingFavoriteBooks, details.favoriteBook);
+    if (details.mode) addCount(report.readingModeCounts, String(details.mode).replace(/-/g, " "));
+    report.readingRepeatTurns += Number(details.repeatTurns || 0);
+    report.readingCommunicationResponses += Number(details.communicationResponses || 0);
+    report.readingRecorderTurns += Number(details.usedRecorder || 0);
+    report.readingParentNarratedPages += Number(details.parentNarratedPages || 0);
+    if (details.bookTitle || details.pagesViewed || details.repeatTurns || details.communicationResponses) {
+      touch(report, "reading", details.bookTitle || "Reading activity");
+    } else {
+      report.lastActivityAt ||= new Date().toISOString();
+    }
+    BB.store.save();
+  }
+
   function recordVideo(profileId, video = {}) {
     const report = ensureDay(profileId, new Date(), false);
     const label = String(video.title || "Approved video");
@@ -302,9 +363,9 @@
   function aggregate(items = []) {
     const result = newRecord("summary", items.length ? `${items.at(-1).reportDate} to ${items[0].reportDate}` : localDate());
     result.totalAppSessions = 0;
-    const maps = ["communicationCategoryCounts", "phraseCounts", "feelingsSelected", "calmStrategiesUsed", "needsCommunicated", "videosViewed", "goalsCompleted", "starReasons"];
+    const maps = ["communicationCategoryCounts", "phraseCounts", "feelingsSelected", "calmStrategiesUsed", "needsCommunicated", "videosViewed", "goalsCompleted", "starReasons", "talkLessonsOpened", "soundsPracticed", "wordsPracticed", "phrasesPracticed", "readingBooksOpened", "readingBooksCompleted", "readingFavoriteBooks", "readingModeCounts"];
     for (const report of items) {
-      ["totalAppSessions", "totalSessionSeconds", "totalCardTaps", "parentVoiceUsageCount", "defaultVoiceUsageCount", "textToSpeechUsageCount", "visualFallbackUsageCount", "videoSeconds", "starsEarned", "weekendBonusStars"].forEach(field => result[field] += Number(report[field]) || 0);
+      ["totalAppSessions", "totalSessionSeconds", "totalCardTaps", "parentVoiceUsageCount", "defaultVoiceUsageCount", "textToSpeechUsageCount", "visualFallbackUsageCount", "videoSeconds", "starsEarned", "weekendBonusStars", "talkRepeatTurns", "talkCommunicationResponses", "talkPictureResponses", "talkRecorderTurns", "talkParentVoicePrompts", "talkSkipped", "readingPagesViewed", "readingSeconds", "readingRepeatTurns", "readingCommunicationResponses", "readingRecorderTurns", "readingParentNarratedPages"].forEach(field => result[field] += Number(report[field]) || 0);
       report.uniqueCardKeys.forEach(key => { if (!result.uniqueCardKeys.includes(key)) result.uniqueCardKeys.push(key); });
       maps.forEach(field => Object.entries(report[field] || {}).forEach(([key, value]) => addCount(result[field], key, value)));
       result.safetyEvents.push(...(report.safetyEvents || []));
@@ -319,7 +380,7 @@
   }
 
   function plainSummary(report) {
-    if (!report || (!report.totalCardTaps && !report.totalSessionSeconds && !Object.keys(report.videosViewed || {}).length && !report.starsEarned)) {
+    if (!report || (!report.totalCardTaps && !report.totalSessionSeconds && !Object.keys(report.videosViewed || {}).length && !report.starsEarned && !Object.keys(report.talkLessonsOpened || {}).length && !Object.keys(report.readingBooksOpened || {}).length)) {
       return "No app activity was recorded for this day.";
     }
     const phrases = topEntries(report.phraseCounts, report.excludedPhraseKeys, 2).map(([phrase]) => phrase);
@@ -329,6 +390,9 @@
     if (feeling) parts.push(`The most frequently selected feeling was “${feeling}.”`);
     if (report.parentVoiceUsageCount) parts.push(`Parent-recorded voice cards were used ${report.parentVoiceUsageCount} ${report.parentVoiceUsageCount === 1 ? "time" : "times"}.`);
     if (report.starsEarned) parts.push(`${report.starsEarned} ${report.starsEarned === 1 ? "star was" : "stars were"} collected${report.weekendBonusStars ? `, including ${report.weekendBonusStars} weekend incentive bonus stars` : ""}.`);
+    const lessons=Object.values(report.talkLessonsOpened || {}).reduce((sum,count)=>sum+count,0),books=Object.values(report.readingBooksOpened || {}).reduce((sum,count)=>sum+count,0);
+    if(lessons)parts.push(`${lessons} talking ${lessons===1?"lesson was":"lessons were"} opened with ${report.talkRepeatTurns||0} practice turns.`);
+    if(books)parts.push(`${books} ${books===1?"book was":"books were"} opened and ${report.readingPagesViewed||0} pages were viewed.`);
     return parts.join(" ") || "Activity was recorded without enough communication selections to create a longer summary.";
   }
 
@@ -362,6 +426,24 @@
     section("FEELINGS COMMUNICATED", report.feelingsSelected);
     section("NEEDS COMMUNICATED", report.needsCommunicated);
     section("CALM AND SENSORY SUPPORT", report.calmStrategiesUsed);
+    lines.push("", "SPEECH AND COMMUNICATION PRACTICE",
+      `Lessons opened: ${Object.values(report.talkLessonsOpened || {}).reduce((sum,count)=>sum+count,0)}`,
+      `Sounds practiced: ${Object.keys(report.soundsPracticed || {}).length}`,
+      `Words practiced: ${Object.keys(report.wordsPracticed || {}).length}`,
+      `Phrases practiced: ${Object.keys(report.phrasesPracticed || {}).length}`,
+      `Repeat After Me turns: ${report.talkRepeatTurns || 0}`,
+      `Communication-card or picture responses: ${(report.talkCommunicationResponses || 0) + (report.talkPictureResponses || 0)}`,
+      `Parent voice prompts used: ${report.talkParentVoicePrompts || 0}`,
+      `Prompts skipped: ${report.talkSkipped || 0}`, "",
+      "READING ACTIVITY",
+      `Books opened: ${Object.values(report.readingBooksOpened || {}).reduce((sum,count)=>sum+count,0)}`,
+      `Books completed: ${Object.values(report.readingBooksCompleted || {}).reduce((sum,count)=>sum+count,0)}`,
+      `Pages viewed: ${report.readingPagesViewed || 0}`,
+      `Reading time: ${Math.round((report.readingSeconds || 0) / 60)} minutes`,
+      `Repeat After Me prompts attempted: ${report.readingRepeatTurns || 0}`,
+      `Communication-card responses: ${report.readingCommunicationResponses || 0}`,
+      `Parent-narrated pages played: ${report.readingParentNarratedPages || 0}`
+    );
     const videoCategories = [...new Set(Object.keys(report.videosViewed || {}).map(item => item.split("|")[1]).filter(Boolean))];
     lines.push("", "VOICE SUPPORT",
       `Parent-recorded voice cards used: ${report.parentVoiceUsageCount || 0}`,
@@ -388,11 +470,18 @@
 
   function csv(items = []) {
     const quote = value => `"${String(value ?? "").replace(/"/g, '""')}"`;
-    const headings = ["Date", "Child", "Total Sessions", "Total Minutes", "Card Selections", "Stars Collected", "Weekend Bonus Stars", "Most Used Phrase", "Most Used Category", "Feelings Communicated", "Needs Communicated", "Calm Strategies Used", "Parent Voice Uses", "Videos Watched", "Notes"];
+    const headings = ["Date", "Child", "Total Sessions", "Total Minutes", "Card Selections", "Stars Collected", "Weekend Bonus Stars", "Talking Lessons Opened", "Sounds Practiced", "Words Practiced", "Phrases Practiced", "Repeat After Me Turns", "Books Opened", "Books Completed", "Pages Viewed", "Reading Minutes", "Parent-Narrated Pages", "Most Used Phrase", "Most Used Category", "Feelings Communicated", "Needs Communicated", "Calm Strategies Used", "Parent Voice Uses", "Videos Watched", "Notes"];
     const rows = items.map(report => [
       report.reportDate, profileName(report.childProfileId), report.totalAppSessions || 0,
       Math.round((report.totalSessionSeconds || 0) / 60), report.totalCardTaps || 0,
       report.starsEarned || 0, report.weekendBonusStars || 0,
+      Object.values(report.talkLessonsOpened || {}).reduce((sum,count)=>sum+count,0),
+      Object.keys(report.soundsPracticed || {}).length, Object.keys(report.wordsPracticed || {}).length,
+      Object.keys(report.phrasesPracticed || {}).length, report.talkRepeatTurns || 0,
+      Object.values(report.readingBooksOpened || {}).reduce((sum,count)=>sum+count,0),
+      Object.values(report.readingBooksCompleted || {}).reduce((sum,count)=>sum+count,0),
+      report.readingPagesViewed || 0, Math.round((report.readingSeconds || 0)/60),
+      report.readingParentNarratedPages || 0,
       topEntries(report.phraseCounts, report.excludedPhraseKeys, 1)[0]?.[0] || "No activity recorded",
       topEntries(report.communicationCategoryCounts, [], 1)[0]?.[0] || "No activity recorded",
       topEntries(report.feelingsSelected, []).map(([label, count]) => `${label} (${count})`).join("; ") || "None recorded",
@@ -412,7 +501,7 @@
   window.BB = window.BB || {};
   BB.dailyReports = {
     localDate, ensureDay, checkRollover, startSession, addSessionSeconds,
-    recordCard, markVoice, recordFeeling, recordCalm, recordGoal, recordStars,
+    recordCard, markVoice, recordFeeling, recordCalm, recordGoal, recordStars, recordTalk, recordReading,
     recordVideo, addVideoSeconds, records, aggregate, updateRecord,
     addParentNote, editParentNote, togglePhraseExclusion, topEntries, profileName,
     plainSummary, formatText, csv, safeFileName, reportingState

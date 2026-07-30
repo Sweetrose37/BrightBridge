@@ -154,7 +154,7 @@
     ["i need to breathe", "i want to breathe"]
   ]);
 
-  const eligibleParentVoiceCategories = Object.freeze(["Quick", "Feelings", "Sensory & Calming"]);
+  const eligibleParentVoiceCategories = Object.freeze(["Quick", "Feelings", "Sensory & Calming", "Learn to Talk", "Book Narration"]);
 
   function normalizePhrase(value) {
     return String(value || "")
