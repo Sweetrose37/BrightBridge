@@ -76,7 +76,22 @@
       ["I need my comfort item", "🧸"], ["I want to breathe", "☁️"],
       ["I want calm music", "🎵"], ["I want to rock", "🪑"],
       ["Please do not touch me", "✋"], ["I am getting overwhelmed", "🌊"],
-      ["I feel calm now", "😌"]
+      ["I feel calm now", "😌"], ["It is too dark", "🌑"],
+      ["I do not like this smell", "👃"], ["I do not like this texture", "🖐️"],
+      ["Please lower the sound", "🔉"], ["Please turn off the light", "💡"],
+      ["I need a quiet room", "🚪"], ["I need deep pressure", "🤗"],
+      ["I need my weighted blanket", "🛏️"], ["I need to stim", "🌈"],
+      ["A hug would help", "🤗"], ["No hug please", "✋"],
+      ["I am calming down", "😌"], ["Please wait", "⏳"], ["Stay with me", "🧑‍🤝‍🧑"]
+    ],
+    Feelings: [
+      ["I am happy", "😊"], ["I am sad", "😢"], ["I am angry", "😠"],
+      ["I am scared", "😨"], ["I am worried", "😟"], ["I am frustrated", "😣"],
+      ["I am excited", "🤩"], ["I am tired", "😴"], ["I am confused", "😕"],
+      ["I am calm", "😌"], ["I am lonely", "🫶"], ["I am embarrassed", "😳"],
+      ["I am nervous", "😬"], ["I am overwhelmed", "🌊"],
+      ["I am uncomfortable", "😖"], ["I am proud", "🌟"], ["I am bored", "🥱"],
+      ["I am surprised", "😮"], ["I feel safe", "🛟"], ["I do not feel safe", "⚠️"]
     ],
     "Social Communication": [
       ["Hello", "👋"], ["Goodbye", "👋"], ["Please", "🙏"], ["Thank you", "🌟"],
@@ -128,8 +143,16 @@
     ["please dont touch me", "please do not touch me"],
     ["my tummy hurts", "my stomach hurts"],
     ["repeat please", "please repeat that"],
-    ["again please", "please say it again"]
+    ["again please", "please say it again"],
+    ["it is too loud", "too loud"],
+    ["it is too bright", "too bright"],
+    ["do not touch me", "please do not touch me"],
+    ["dont touch me", "please do not touch me"],
+    ["i need to rock", "i want to rock"],
+    ["i need to breathe", "i want to breathe"]
   ]);
+
+  const eligibleParentVoiceCategories = Object.freeze(["Quick", "Feelings", "Sensory & Calming"]);
 
   function normalizePhrase(value) {
     return String(value || "")
@@ -209,12 +232,16 @@
       active: true,
       sortOrder: 0,
       createdAt: "built-in",
-      updatedAt: "built-in"
+      updatedAt: "built-in",
+      parentVoiceEnabled: eligibleParentVoiceCategories.includes(category)
     })));
   }
 
   window.BB_COMMUNICATION_CARDS = {
     expansions, normalizePhrase, equivalentKey, cardId, dedupeCategory,
-    mergeCatalog, findDuplicate, model
+    mergeCatalog, findDuplicate, model, eligibleParentVoiceCategories,
+    isParentVoiceEligible(category) {
+      return eligibleParentVoiceCategories.includes(category);
+    }
   };
 })();

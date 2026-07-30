@@ -1,8 +1,8 @@
 # BrightBridge Mobile Communication Library
 
-## Mobile 28 summary
+## Mobile 29 summary
 
-BrightBridge Mobile now contains 416 built-in communication cards across 31
+BrightBridge Mobile now contains 450 built-in communication cards across 31
 categories. The previous 162 built-in cards remain available. New card packs
 cover Quick Talk, needs, pain and body, food and drink, people, places,
 activities, sensory and calming, social communication, routines, school and
@@ -22,14 +22,14 @@ in `mobile/mobile.js` and is merged without changing its saved-data keys.
 | Regulation | 8 | Conversation | 8 |
 | Food | 6 | Drinks | 5 |
 | Bathroom | 5 | Help | 6 |
-| Feelings | 7 | Family | 7 |
+| Feelings | 27 | Family | 7 |
 | Animals | 6 | School | 14 |
 | Medical | 6 | Transportation | 6 |
 | Daily Routines | 24 | Places & People | 8 |
 | Independence | 8 | Needs | 20 |
 | Pain & Body | 24 | Food & Drink | 22 |
 | People | 19 | Places | 19 |
-| Activities | 21 | Sensory & Calming | 19 |
+| Activities | 21 | Sensory & Calming | 33 |
 | Social Communication | 22 | School & Learning | 26 |
 | Safety | 16 |  |  |
 
@@ -54,15 +54,19 @@ Custom cards in different categories remain separate.
 ## Parent Voices
 
 `mobile/parent-voices.js` is the private, IndexedDB-backed Parent Voice data
-layer. Write, list, replace, remove, and clear operations require an in-memory
-authorization capability issued only after the existing Parent PIN succeeds.
-Child playback can ask for the assigned phrase but cannot open the management
-library.
+layer shared by Quick, Feelings, and Sensory & Calming. Each recording is keyed
+by recording ID and card ID, with category and child-profile assignments.
+Different children may therefore use different recordings for the same card
+without one card or profile overwriting another. Mobile 28 phrase records migrate
+to the Quick category automatically. Write, list, replace, remove, and clear
+operations require an in-memory authorization capability issued only after the
+existing Parent PIN succeeds. Child playback can request its assigned card audio
+but cannot open the management library.
 
 To add a voice:
 
 1. Open **Grown-up Area** and enter the Parent PIN.
-2. Choose **Quick Talk Voices**.
+2. Choose **Parent Card Voices**.
 3. Choose **Add voice** for a card.
 4. Record after the 3-second countdown, or upload an MP3, M4A, WAV, or AAC file.
 5. Preview it, assign one, several, or all child profiles, and choose **Save
@@ -70,8 +74,9 @@ To add a voice:
 
 Clips are limited to 15 seconds and 12 MB. Recordings remain staged until Save
 Voice is selected. Removing a Parent Voice restores the pre-existing family
-recording/visual fallback. Parent Voice playback has first priority and stops
-other speech before starting.
+recording. Parent Voice playback has first priority, followed by an existing
+family recording, device text-to-speech, and a visual-only fallback. Playback
+cancellation prevents rapid taps from overlapping.
 
 No dependency, analytics, advertising, account, cloud upload, or AI service was
 added. Microphone access is requested only after Record is selected.
@@ -81,11 +86,12 @@ added. Microphone access is requested only after Record is selected.
 - All 30 JavaScript files parsed successfully.
 - All 10 JSON files parsed successfully.
 - All 28 local mobile HTML references resolved.
-- The 416-card catalog was audited with zero remaining within-category
+- The 450-card catalog was audited with zero remaining within-category
   duplicates.
-- Parent Voice data-layer tests covered unauthorized writes, authorized
-  save/list, one-profile assignment, all-profile assignment, replacement,
-  removal/restore, and capability invalidation after locking.
+- Parent Voice data-layer tests covered unauthorized writes, legacy Quick
+  migration, different audio for two profiles, the same phrase on different
+  cards, source and category metadata, removal/restore, category eligibility,
+  and capability invalidation after locking.
 - Duplicate tests covered punctuation/case/spacing, contractions, equivalent
   body phrases, category case normalization, and cross-category allowance.
 - Local HTTP smoke tests returned 200 for the mobile entry page, main script,

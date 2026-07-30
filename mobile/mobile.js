@@ -380,6 +380,7 @@
   const catalogUpgrade=BB_COMMUNICATION_CARDS.mergeCatalog(aac);
   Object.assign(aac,catalogUpgrade.catalog);
   const communicationCardModel=BB_COMMUNICATION_CARDS.model(aac);
+  const eligibleParentVoiceCategories=BB_COMMUNICATION_CARDS.eligibleParentVoiceCategories;
   const quickTalk=aac.Quick;
   const spanishWords={"I want":"Quiero","I need":"Necesito","More":"Más","All done":"Terminé","Yes":"Sí","No":"No","Please":"Por favor","Thank you":"Gracias","Apple":"Manzana","Banana":"Plátano","Sandwich":"Sándwich","Crackers":"Galletas","Yogurt":"Yogur","Hungry":"Tengo hambre","Water":"Agua","Milk":"Leche","Juice":"Jugo","Thirsty":"Tengo sed","Cup":"Vaso","Bathroom":"Baño","Toilet":"Inodoro","Wash hands":"Lavar las manos","Help please":"Ayuda, por favor","Wet":"Mojado","Help":"Ayuda","Stop":"Alto","Break":"Descanso","Too loud":"Demasiado fuerte","It hurts":"Me duele","I don't know":"No sé","Happy":"Feliz","Sad":"Triste","Angry":"Enojado","Calm":"Tranquilo","Scared":"Asustado","Tired":"Cansado","Excited":"Emocionado","Mom":"Mamá","Dad":"Papá","Grandma":"Abuela","Grandpa":"Abuelo","Brother":"Hermano","Sister":"Hermana","Home":"Casa","Dog":"Perro","Cat":"Gato","Bird":"Pájaro","Fish":"Pez","Horse":"Caballo","Animal":"Animal","Teacher":"Maestro","School":"Escuela","Book":"Libro","Pencil":"Lápiz","Friend":"Amigo","My turn":"Mi turno","Doctor":"Doctor","Medicine":"Medicina","My head hurts":"Me duele la cabeza","My tummy hurts":"Me duele el estómago","Bandage":"Venda","Emergency":"Emergencia","Car":"Carro","Bus":"Autobús","Train":"Tren","Bike":"Bicicleta","Go":"Ir","Again please":"Otra vez, por favor","Look with me":"Mira conmigo","My favorite":"Mi favorito","I can read":"Puedo leer","What comes next?":"¿Qué sigue?","I need a schedule":"Necesito un horario","I have a goal":"Tengo una meta","I need more time":"Necesito más tiempo","Can you explain?":"¿Puedes explicar?","I can speak up for myself":"Puedo defenderme","I need transportation":"Necesito transporte","My future goal":"Mi meta futura"};
   const feelings=[["Happy","😊","I feel bright and happy."],["Sad","😢","I may want comfort."],["Angry","😠","I can pause and breathe."],["Calm","😌","My body feels quiet."],["Scared","😨","I can find a safe grown-up."],["Tired","😴","My body may need rest."],["Excited","🤩","I have lots of happy energy."],["Frustrated","😣","I can take a break and try later."]];
@@ -426,8 +427,15 @@
   let chunks=[];
   let recordingLabel="";
   let parentVoiceQuery="";
+  let parentVoiceCategory="Quick";
+  let parentVoiceLibraryCategory="all";
+  let parentVoiceLibraryProfile="all";
+  let parentVoiceLibrarySource="all";
   let parentVoiceRecords=[];
   let editingParentVoicePhrase="";
+  let editingParentVoiceCategory="";
+  let editingParentVoiceCardId="";
+  let editingParentVoiceRecordingId="";
   let stagedParentVoice=null;
   let stagedParentVoiceDuration=0;
   let stagedParentVoiceSource="";
@@ -438,6 +446,7 @@
   let parentVoiceTimer=null;
   let cancelParentVoiceCapture=false;
   let editingCustomId="";
+  let speechGeneration=0;
   let currentGame=null;
   let cardIndex=0;
   let roundIndex=0;
@@ -1050,6 +1059,7 @@
       });
       customLoadedProfile=profileId;
       if(route==="communication"){view.innerHTML=renderCommunication();if(voiceSetup)setTimeout(refreshVoiceList,0);}
+      if(route==="quickTalkVoices")view.innerHTML=renderQuickTalkVoices();
     }catch{toast("Custom cards could not be opened on this device.");}
   }
 
@@ -1165,10 +1175,11 @@
   function closeModal(){
     destroyVideoPlayer();
     stopParentVoiceRecording(true);
-    stagedParentVoice=null;stagedParentVoiceDuration=0;stagedParentVoiceSource="";editingParentVoicePhrase="";
+    stagedParentVoice=null;stagedParentVoiceDuration=0;stagedParentVoiceSource="";editingParentVoicePhrase="";editingParentVoiceCategory="";editingParentVoiceCardId="";editingParentVoiceRecordingId="";
     modalRoot.innerHTML="";
     pinSuccess=null;
     BB.speech.stop();
+    window.speechSynthesis?.cancel();
   }
 
   function resetPageScroll(){
@@ -1188,6 +1199,7 @@
     BB.audio.stopMusic();
     BB.speech.stop();
     BB.parentVoices.stop();
+    window.speechSynthesis?.cancel();
     route=next;
     render(options);
     document.querySelectorAll(".mobile-bottom-nav [data-route]").forEach(button=>{
@@ -1220,6 +1232,7 @@
       if(customLoadedProfile!==activeProfile().id)setTimeout(()=>loadCustomCards(),0);
     }
     if(["quickTalkVoices","parentVoiceLibrary"].includes(route))setTimeout(()=>loadParentVoices(true),0);
+    if(route==="quickTalkVoices"&&customLoadedProfile!==activeProfile().id)setTimeout(()=>loadCustomCards(),0);
     if(route==="calm")setupSensory();
     if(route==="flashcards"&&currentGame?.id==="tracing")setupTracing();
     if(route==="tools")BB.mobileTools.afterRender();
@@ -1240,7 +1253,7 @@
     return `<section>
       <div class="mobile-hero"><div class="mobile-hero-row"><div><p class="muted">Welcome back</p><h1>Hello, ${esc(profile.name)}!</h1></div><div class="mobile-hero-face">😊</div></div><p>Choose what feels good today. There is no timer, no losing, and you can always try again.</p></div>
       ${BB.memoryJourney?.homeBanner?.()||""}
-      <div class="mobile-whats-new"><div><span>✨ MOBILE 28</span><h2>More Ways to Communicate</h2><p>A larger duplicate-safe card library plus private, profile-aware Parent Voices for Quick Talk.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Expanded Communication</strong><small>Needs, pain, safety, school & more</small></button><button type="button" data-route="parent"><span>🎙️</span><strong>Parent Voices</strong><small>Record or upload behind the Parent PIN</small></button><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>Only assigned, active approvals</small></button><button type="button" data-route="caregiverVideos"><span>📨</span><strong>Request a Video</strong><small>Separate caregiver request access</small></button></div></div>
+      <div class="mobile-whats-new"><div><span>✨ MOBILE 29</span><h2>Familiar Voices for More Cards</h2><p>The protected Parent Voice recorder now supports Quick Talk, Feelings, and Calm & Sensory with separate voices for each child.</p></div><div class="mobile-quick-grid"><button type="button" data-route="communication"><span>💬</span><strong>Expanded Communication</strong><small>Needs, feelings, sensory, safety & more</small></button><button type="button" data-route="parent"><span>🎙️</span><strong>Parent Card Voices</strong><small>Record or upload behind the Parent PIN</small></button><button type="button" data-route="videos"><span>📺</span><strong>Approved Videos</strong><small>Only assigned, active approvals</small></button><button type="button" data-route="caregiverVideos"><span>📨</span><strong>Request a Video</strong><small>Separate caregiver request access</small></button></div></div>
       <div class="mobile-section-title"><h2>Choose an adventure</h2><small>Tap any card</small></div>
       <div class="mobile-card-grid">${cards.map(([id,icon,title,detail,color])=>`<button class="mobile-home-card" style="--card:${color}" type="button" data-route="${id}"><span>${icon}</span><strong>${title}</strong><small>${detail}</small></button>`).join("")}</div>
     </section>`;
@@ -1248,18 +1261,19 @@
 
   function communicationItems(){
     const growthWords=BB.memoryJourney?.stageVocabulary?.()||[];
-    const custom=visibleCustomItems(),all=[...Object.values(aac).flat(),...emergencyItems(),...growthWords,...custom];
+    const custom=visibleCustomItems().map(([word,icon,photo,id])=>[word,icon,photo,id,customCards.find(item=>item.id===id)?.category||"Custom"]);
+    const all=[...Object.entries(aac).flatMap(([cardCategory,cards])=>cards.map(([word,icon])=>[word,icon,"",BB_COMMUNICATION_CARDS.cardId(cardCategory,word),cardCategory])),...emergencyItems().map(item=>[...item,"","","Emergency"]),...growthWords.map(item=>[...item,"","","Growth Path"]),...custom];
     let items;
     if(category==="Favorites")items=all.filter(([word])=>BB.store.data.favorites.includes(word)||BB.store.data.favorites.includes(spanishWords[word]));
     else if(category==="Recent")items=BB.store.data.recentWords.map(word=>all.find(item=>item[0]===word||spanishWords[item[0]]===word)||[word,"💬"]);
-    else if(category==="Growth Path")items=growthWords;
-    else if(category==="Emergency")items=emergencyItems();
+    else if(category==="Growth Path")items=growthWords.map(item=>[...item,"","","Growth Path"]);
+    else if(category==="Emergency")items=emergencyItems().map(item=>[...item,"","","Emergency"]);
     else{
-      const customInCategory=customCards.filter(item=>!item.hidden&&(item.category||"Custom")===category).map(item=>[item.label,item.icon||"💬",item.photoUrl||"",item.id]);
-      items=[...(aac[category]||[]),...customInCategory];
-      if(!items.length)items=aac.Quick;
+      const customInCategory=customCards.filter(item=>!item.hidden&&(item.category||"Custom")===category).map(item=>[item.label,item.icon||"💬",item.photoUrl||"",item.id,item.category||"Custom"]);
+      items=[...(aac[category]||[]).map(([word,icon])=>[word,icon,"",BB_COMMUNICATION_CARDS.cardId(category,word),category]),...customInCategory];
+      if(!items.length)items=aac.Quick.map(([word,icon])=>[word,icon,"",BB_COMMUNICATION_CARDS.cardId("Quick",word),"Quick"]);
     }
-    return BB.store.data.settings.language==="es-US"?items.map(([word,icon,photo,id])=>[spanishWords[word]||word,icon,photo,id]):items;
+    return BB.store.data.settings.language==="es-US"?items.map(([word,icon,photo,id,cardCategory])=>[spanishWords[word]||word,icon,photo,id,cardCategory]):items;
   }
 
   function renderCustomManager(){
@@ -1296,38 +1310,53 @@
     const categories=[...new Set([...Object.keys(aac),"Emergency",...customCategories,"Growth Path","Favorites","Recent"])];
     return `<section>
       ${pageHead("Communication","Tap cards to build the sentence exactly as written.")}
-      <div class="mobile-voice-banner"><div><strong>🎙️ Family Voice Cards</strong><small>Quick Talk uses the protected Parent Voice editor. Other cards keep their existing family recordings.</small></div><button type="button" data-route="quickTalkVoices">Quick Talk voices</button><button type="button" data-action="voice-setup">${voiceSetup?"Done":"Other cards"}</button></div>
+      <div class="mobile-voice-banner"><div><strong>🎙️ Family Voice Cards</strong><small>Quick Talk, Feelings, and Calm & Sensory use the protected Parent Voice editor. Other cards keep their existing family recordings.</small></div><button type="button" data-route="quickTalkVoices">Parent Card Voices</button><button type="button" data-action="voice-setup">${voiceSetup?"Done":"Other cards"}</button></div>
       ${voiceSetup?`<div class="mobile-panel"><h3>Private caregiver recording mode</h3><p>Record or upload the exact words shown on each card. Recordings stay on this device.</p><div id="voice-list" class="voice-list"><p class="muted">Checking saved voices…</p></div>${renderCustomManager()}</div><div class="mobile-recording"><span data-record-status>Choose a card to record.</span><button type="button" data-action="record-stop" hidden>■ Stop & save</button></div>`:""}
       <div class="mobile-sentence"><textarea rows="2" data-sentence aria-label="Communication sentence" placeholder="Your sentence…">${esc(sentence)}</textarea><div class="mobile-sentence-actions"><button type="button" data-action="sentence-clear" aria-label="Clear">✕</button><button type="button" data-action="sentence-speak" aria-label="Play the exact sentence">🔊</button></div></div>
-      <div class="mobile-quick-talk" aria-label="Quick Talk"><strong>Quick Talk</strong><div>${quickTalk.map(([word,icon])=>{const shown=BB.store.data.settings.language==="es-US"?(spanishWords[word]||word):word;return `<button type="button" data-word="${esc(shown)}"><span>${icon}</span>${esc(shown)}</button>`;}).join("")}</div></div>
+      <div class="mobile-quick-talk" aria-label="Quick Talk"><strong>Quick Talk</strong><div>${quickTalk.map(([word,icon])=>{const shown=BB.store.data.settings.language==="es-US"?(spanishWords[word]||word):word;return `<button type="button" data-word="${esc(shown)}" data-voice-category="Quick" data-voice-card-id="${esc(BB_COMMUNICATION_CARDS.cardId("Quick",word))}"><span>${icon}</span>${esc(shown)}</button>`;}).join("")}</div></div>
       <div class="mobile-category-row">${categories.map(name=>`<button class="mobile-chip ${category===name?"active":""}" type="button" data-category="${esc(name)}">${esc(name)}</button>`).join("")}</div>
-      <div class="mobile-aac-grid">${items.length?items.map(([word,icon,photo])=>`<article class="mobile-aac-card"><button class="mobile-favorite" type="button" data-favorite="${esc(word)}" aria-label="Favorite ${esc(word)}">${BB.store.data.favorites.includes(word)?"⭐":"☆"}</button><button class="mobile-aac-say" type="button" data-word="${esc(word)}">${photo?`<img class="mobile-aac-photo" src="${photo}" alt="">`:`<span class="icon">${icon}</span>`}<strong>${esc(word)}</strong></button>${voiceSetup?(category==="Quick"?'<div class="mobile-voice-actions"><button type="button" data-route="quickTalkVoices">🔒 Parent Voice</button></div>':`<div class="mobile-voice-actions"><button type="button" data-record-card="${esc(word)}">🎙️ Record</button><label>⬆ Upload<input class="sr-only" type="file" accept="audio/*" data-upload-card="${esc(word)}"></label></div>`):""}</article>`).join(""):`<div class="mobile-panel"><h3>No cards here yet</h3><p>Add a custom card or choose another category.</p></div>`}</div>
+      <div class="mobile-aac-grid">${items.length?items.map(([word,icon,photo,id,cardCategory])=>`<article class="mobile-aac-card"><button class="mobile-favorite" type="button" data-favorite="${esc(word)}" aria-label="Favorite ${esc(word)}">${BB.store.data.favorites.includes(word)?"⭐":"☆"}</button><button class="mobile-aac-say" type="button" data-word="${esc(word)}" data-voice-category="${esc(cardCategory||"")}" data-voice-card-id="${esc(id||"")}">${photo?`<img class="mobile-aac-photo" src="${photo}" alt="">`:`<span class="icon">${icon}</span>`}<strong>${esc(word)}</strong></button>${voiceSetup?(BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory)?`<div class="mobile-voice-actions"><button type="button" data-parent-voice-launch="${esc(cardCategory)}">🔒 Parent Voice</button></div>`:`<div class="mobile-voice-actions"><button type="button" data-record-card="${esc(word)}">🎙️ Record</button><label>⬆ Upload<input class="sr-only" type="file" accept="audio/*" data-upload-card="${esc(word)}"></label></div>`):""}</article>`).join(""):`<div class="mobile-panel"><h3>No cards here yet</h3><p>Add a custom card or choose another category.</p></div>`}</div>
     </section>`;
   }
 
   function parentVoiceAssignments(record){
     if(!record)return "No parent voice";
-    if(record.assignments?.includes("*"))return "All child profiles";
-    return (record.assignments||[]).map(id=>BB.store.data.profiles.find(profile=>profile.id===id)?.name).filter(Boolean).join(", ")||"No profile assigned";
+    if(record.childProfileIds?.includes("*"))return "All child profiles";
+    return (record.childProfileIds||[]).map(id=>BB.store.data.profiles.find(profile=>profile.id===id)?.name).filter(Boolean).join(", ")||"No profile assigned";
   }
 
   function renderQuickTalkVoices(){
     if(!parentUnlocked)return renderParent();
-    const byPhrase=new Map(parentVoiceRecords.map(record=>[BB_COMMUNICATION_CARDS.equivalentKey(record.phrase),record]));
-    return `<section>${pageHead("Quick Talk Voices","Record a familiar voice for each high-use communication card.","parent")}
+    const cards=[
+      ...(aac[parentVoiceCategory]||[]).map(([phrase,icon])=>({phrase,icon,cardId:BB_COMMUNICATION_CARDS.cardId(parentVoiceCategory,phrase)})),
+      ...customCards.filter(item=>!item.hidden&&BB_COMMUNICATION_CARDS.normalizePhrase(item.category)===BB_COMMUNICATION_CARDS.normalizePhrase(parentVoiceCategory)).map(item=>({phrase:item.label,icon:item.icon||"💬",cardId:item.id}))
+    ];
+    return `<section>${pageHead("Parent Card Voices","One protected recorder for Quick Talk, Feelings, and Calm & Sensory.","parent")}
       <div class="mobile-panel"><h3>🔒 Private and local</h3><p>Recordings stay on this device. The microphone is requested only after you choose Record. Each clip may be up to 15 seconds.</p><button class="mobile-button secondary" type="button" data-route="parentVoiceLibrary">Open Parent Voice Library</button></div>
-      <div class="mobile-parent-voice-grid">${quickTalk.map(([phrase,icon])=>{const record=byPhrase.get(BB_COMMUNICATION_CARDS.equivalentKey(phrase));return `<article class="mobile-parent-voice-card"><span>${icon}</span><div><strong>${esc(phrase)}</strong><small>${record?`✓ Parent Voice Added · ${esc(parentVoiceAssignments(record))}`:"Uses the existing voice fallback"}</small></div><button class="mobile-button" type="button" data-parent-voice-edit="${esc(phrase)}">${record?"Edit voice":"Add voice"}</button>${record?`<button class="compact-button" type="button" data-parent-voice-preview="${esc(phrase)}" aria-label="Preview ${esc(phrase)}">▶</button>`:""}</article>`;}).join("")}</div>
+      <div class="mobile-category-row">${eligibleParentVoiceCategories.map(name=>`<button class="mobile-chip ${parentVoiceCategory===name?"active":""}" type="button" data-parent-voice-category="${esc(name)}">${name==="Sensory & Calming"?"Calm & Sensory":esc(name)}</button>`).join("")}</div>
+      <p class="muted">${cards.length} audio-enabled ${parentVoiceCategory==="Sensory & Calming"?"Calm & Sensory":esc(parentVoiceCategory)} cards. Future cards in this category appear automatically.</p>
+      <div class="mobile-parent-voice-grid">${cards.map(({phrase,icon,cardId})=>{const records=parentVoiceRecords.filter(record=>record.cardId===cardId),record=records[0];return `<article class="mobile-parent-voice-card"><span>${icon}</span><div><strong>${esc(phrase)}</strong><small>${records.length?`✓ Parent Voice Added${records.length>1?` · ${records.length} profile voices`:""} · ${esc(parentVoiceAssignments(record))}`:"Uses the existing voice fallback"}</small></div><button class="mobile-button" type="button" data-parent-voice-edit="${esc(phrase)}" data-parent-voice-card-id="${esc(cardId)}" data-parent-voice-card-category="${esc(parentVoiceCategory)}" ${record?`data-parent-voice-recording-id="${esc(record.recordingId)}"`:""}>${record?"Manage voice":"Add voice"}</button>${record?`<button class="compact-button" type="button" data-parent-voice-preview="${esc(record.recordingId)}" aria-label="Preview ${esc(phrase)}">▶</button><button class="mobile-button secondary" type="button" data-parent-voice-edit="${esc(phrase)}" data-parent-voice-card-id="${esc(cardId)}" data-parent-voice-card-category="${esc(parentVoiceCategory)}">＋ Another profile voice</button>`:""}</article>`;}).join("")}</div>
     </section>`;
   }
 
   function renderParentVoiceLibrary(){
     if(!parentUnlocked)return renderParent();
     const query=BB_COMMUNICATION_CARDS.normalizePhrase(parentVoiceQuery);
-    const records=parentVoiceRecords.filter(record=>!query||BB_COMMUNICATION_CARDS.normalizePhrase(record.phrase).includes(query));
+    const records=parentVoiceRecords.filter(record=>
+      (!query||BB_COMMUNICATION_CARDS.normalizePhrase(record.phrase).includes(query)) &&
+      (parentVoiceLibraryCategory==="all"||record.categoryId===parentVoiceLibraryCategory) &&
+      (parentVoiceLibraryProfile==="all"||record.childProfileIds?.includes("*")||record.childProfileIds?.includes(parentVoiceLibraryProfile)) &&
+      (parentVoiceLibrarySource==="all"||record.audioSource===parentVoiceLibrarySource)
+    );
     return `<section>${pageHead("Parent Voice Library","Search, preview, replace, or restore the existing voice.","parent")}
       <label class="mobile-tool-label"><span>Search voices</span><input type="search" data-parent-voice-search value="${esc(parentVoiceQuery)}" placeholder="Search card words"></label>
+      <div class="mobile-parent-voice-filters">
+        <label><span>Category</span><select data-parent-voice-filter="category"><option value="all">All recordings</option>${eligibleParentVoiceCategories.map(name=>`<option value="${esc(name)}" ${parentVoiceLibraryCategory===name?"selected":""}>${name==="Sensory & Calming"?"Calm & Sensory":esc(name)}</option>`).join("")}</select></label>
+        <label><span>Child profile</span><select data-parent-voice-filter="profile"><option value="all">All child profiles</option>${BB.store.data.profiles.map(profile=>`<option value="${esc(profile.id)}" ${parentVoiceLibraryProfile===profile.id?"selected":""}>${esc(profile.name)}</option>`).join("")}</select></label>
+        <label><span>Audio source</span><select data-parent-voice-filter="source"><option value="all">Recorded and uploaded</option><option value="recording" ${parentVoiceLibrarySource==="recording"?"selected":""}>Recorded audio</option><option value="upload" ${parentVoiceLibrarySource==="upload"?"selected":""}>Uploaded audio</option></select></label>
+      </div>
       <p class="muted">${parentVoiceRecords.length} private parent ${parentVoiceRecords.length===1?"voice":"voices"} on this device.</p>
-      <div class="mobile-parent-voice-list">${records.map(record=>`<article class="mobile-parent-voice-card"><span>🎧</span><div><strong>${esc(record.phrase)}</strong><small>${esc(parentVoiceAssignments(record))} · ${Math.round(record.duration||0)} sec · ${esc(record.source||"recording")}</small></div><button class="compact-button" type="button" data-parent-voice-preview="${esc(record.phrase)}" aria-label="Preview ${esc(record.phrase)}">▶</button><button class="compact-button" type="button" data-parent-voice-edit="${esc(record.phrase)}" aria-label="Replace ${esc(record.phrase)}">✏️</button><button class="compact-button danger" type="button" data-parent-voice-remove="${esc(record.phrase)}" aria-label="Restore default voice for ${esc(record.phrase)}">↩</button></article>`).join("")||'<div class="mobile-panel"><p>No matching parent voices.</p></div>'}</div>
+      <div class="mobile-parent-voice-list">${records.map(record=>`<article class="mobile-parent-voice-card"><span>🎧</span><div><strong>${esc(record.phrase)}</strong><small>${esc(record.categoryId==="Sensory & Calming"?"Calm & Sensory":record.categoryId)} · ${esc(parentVoiceAssignments(record))} · ${Math.round(record.duration||0)} sec · ${esc(record.audioSource||"recording")} · ${new Date(record.updatedAt).toLocaleDateString()}</small></div><button class="compact-button" type="button" data-parent-voice-preview="${esc(record.recordingId)}" aria-label="Preview ${esc(record.phrase)}">▶</button><button class="compact-button" type="button" data-parent-voice-edit="${esc(record.phrase)}" data-parent-voice-card-id="${esc(record.cardId)}" data-parent-voice-card-category="${esc(record.categoryId)}" data-parent-voice-recording-id="${esc(record.recordingId)}" aria-label="Replace or reassign ${esc(record.phrase)}">✏️</button><button class="compact-button danger" type="button" data-parent-voice-remove="${esc(record.recordingId)}" data-parent-voice-remove-phrase="${esc(record.phrase)}" aria-label="Restore default voice for ${esc(record.phrase)}">↩</button></article>`).join("")||'<div class="mobile-panel"><p>No matching parent voices.</p></div>'}</div>
     </section>`;
   }
 
@@ -1340,33 +1369,34 @@
   }
 
   function voiceEditorContent(phrase,record){
-    const profiles=BB.store.data.profiles,all=record?.assignments?.includes("*")||!record;
+    const profiles=BB.store.data.profiles,all=record?.childProfileIds?.includes("*")||false;
     return `<div class="mobile-modal-head"><h2>🎙️ ${esc(phrase)}</h2><button class="mobile-close" type="button" data-action="parent-voice-cancel">×</button></div>
-      <p>Record the exact words on this card in a familiar voice. Recording starts only after a 3-second countdown and never saves until you tap Save Voice.</p>
+      <p><strong>Record a short, clear phrase for this communication card.</strong></p><p>Exact card phrase: “${esc(phrase)}”</p><p>Recording starts only after a 3-second countdown and never saves until you tap Save Voice.</p>
       <div class="mobile-recording-status" data-parent-record-status>${stagedParentVoice?`Ready to preview · ${Math.round(stagedParentVoiceDuration)} seconds`:(record?"Current parent voice is ready.":"No parent voice added yet.")}</div>
       <div class="mobile-parent-recorder-actions">
-        <button class="mobile-button" type="button" data-action="parent-record-start">🎙️ ${record||stagedParentVoice?"Re-record":"Record"}</button>
-        <label class="mobile-button secondary">⬆ Upload<input class="sr-only" type="file" accept=".mp3,.m4a,.wav,.aac,audio/mpeg,audio/mp4,audio/wav,audio/aac" data-parent-voice-upload></label>
-        <button class="mobile-button secondary" type="button" data-action="parent-preview-play" ${stagedParentVoice?"":"disabled"}>▶ Play</button>
-        <button class="mobile-button secondary" type="button" data-action="parent-preview-pause" ${stagedParentVoice?"":"disabled"}>⏸ Pause</button>
-        <button class="mobile-button secondary" type="button" data-action="parent-preview-stop" ${stagedParentVoice?"":"disabled"}>■ Stop</button>
+        <button class="mobile-button" type="button" data-action="parent-record-start" aria-label="Record Parent Voice for ${esc(phrase)}">🎙️ ${record||stagedParentVoice?"Re-record":"Record Parent Voice"}</button>
+        <label class="mobile-button secondary" aria-label="Upload Audio for ${esc(phrase)}">⬆ ${record||stagedParentVoice?"Replace Audio":"Upload Audio"}<input class="sr-only" type="file" accept=".mp3,.m4a,.wav,.aac,audio/mpeg,audio/mp4,audio/wav,audio/aac" data-parent-voice-upload></label>
+        <button class="mobile-button secondary" type="button" data-action="parent-preview-play" aria-label="Play Preview" ${stagedParentVoice?"":"disabled"}>▶ Play Preview</button>
+        <button class="mobile-button secondary" type="button" data-action="parent-preview-pause" aria-label="Pause Preview" ${stagedParentVoice?"":"disabled"}>⏸ Pause Preview</button>
+        <button class="mobile-button secondary" type="button" data-action="parent-preview-stop" aria-label="Stop Preview" ${stagedParentVoice?"":"disabled"}>■ Stop Preview</button>
       </div>
       <fieldset class="mobile-child-assignment"><legend>Use this voice for</legend>
         <label><input type="checkbox" data-parent-voice-all ${all?"checked":""}><span>All child profiles</span></label>
-        ${profiles.map(profile=>`<label><input type="checkbox" data-parent-voice-profile="${esc(profile.id)}" ${!all&&record?.assignments?.includes(profile.id)?"checked":""}><span>${profile.avatar||"🌟"} ${esc(profile.name)}</span></label>`).join("")}
+        ${profiles.map(profile=>`<label><input type="checkbox" data-parent-voice-profile="${esc(profile.id)}" ${!all&&(record?.childProfileIds?.includes(profile.id)||(!record&&profile.id===activeProfile().id))?"checked":""}><span>${profile.avatar||"🌟"} ${esc(profile.name)}</span></label>`).join("")}
       </fieldset>
       <p class="muted">Accepted uploads: MP3, M4A, WAV, or AAC; maximum 15 seconds and 12 MB. Files stay in private device storage.</p>
       <div class="mobile-button-row"><button class="mobile-button" type="button" data-action="parent-voice-save" ${stagedParentVoice?"":"disabled"}>Save Voice</button>${record?'<button class="mobile-button secondary" type="button" data-action="parent-voice-restore">Remove & Restore Default Voice</button>':""}<button class="mobile-button secondary" type="button" data-action="parent-voice-cancel">Cancel</button></div>`;
   }
 
-  async function openParentVoiceEditor(phrase){
-    if(!parentVoiceActor){showPin(()=>openParentVoiceEditor(phrase));return;}
+  async function openParentVoiceEditor(phrase,cardCategory=parentVoiceCategory,recordingId="",cardId=""){
+    if(!parentVoiceActor){showPin(()=>openParentVoiceEditor(phrase,cardCategory,recordingId,cardId));return;}
+    if(!BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory)){toast("Parent Voice is not enabled for this card.");return;}
     stopParentVoiceRecording(true);
-    editingParentVoicePhrase=phrase;
-    const record=await BB.parentVoices.getForParent(parentVoiceActor,phrase);
+    editingParentVoicePhrase=phrase;editingParentVoiceCategory=cardCategory;editingParentVoiceRecordingId=recordingId;editingParentVoiceCardId=cardId||BB_COMMUNICATION_CARDS.cardId(cardCategory,phrase);
+    const record=recordingId?await BB.parentVoices.getForParent(parentVoiceActor,{recordingId}):null;
     stagedParentVoice=record?.blob||null;
     stagedParentVoiceDuration=record?.duration||0;
-    stagedParentVoiceSource=record?.source||"recording";
+    stagedParentVoiceSource=record?.audioSource||"recording";
     modal(voiceEditorContent(phrase,record),`Parent voice for ${phrase}`);
   }
 
@@ -1382,6 +1412,7 @@
     try{
       updateParentRecordStatus("Waiting for microphone permission…");
       parentVoiceStream=await navigator.mediaDevices.getUserMedia({audio:true});
+      parentVoiceStream.getTracks().forEach(track=>track.addEventListener("ended",()=>{if(parentVoiceRecorder?.state==="recording"){stopParentVoiceRecording();toast("Recording stopped because the microphone was interrupted. Preview it before saving.");}},{once:true}));
       const preferred=["audio/webm;codecs=opus","audio/webm","audio/mp4"].find(type=>MediaRecorder.isTypeSupported(type));
       parentVoiceRecorder=preferred?new MediaRecorder(parentVoiceStream,{mimeType:preferred}):new MediaRecorder(parentVoiceStream);
       parentVoiceChunks=[];parentVoiceStartedAt=Date.now();cancelParentVoiceCapture=false;
@@ -1393,7 +1424,7 @@
         parentVoiceStream?.getTracks().forEach(track=>track.stop());parentVoiceStream=null;
         if(!blob.size){toast("The recording was empty. Please try again.");return;}
         stagedParentVoice=blob;stagedParentVoiceDuration=duration;stagedParentVoiceSource="recording";
-        BB.parentVoices.getForParent(parentVoiceActor,editingParentVoicePhrase).then(record=>modal(voiceEditorContent(editingParentVoicePhrase,record),`Parent voice for ${editingParentVoicePhrase}`));
+        BB.parentVoices.getForParent(parentVoiceActor,{recordingId:editingParentVoiceRecordingId}).then(record=>modal(voiceEditorContent(editingParentVoicePhrase,record),`Parent voice for ${editingParentVoicePhrase}`));
       },{once:true});
       parentVoiceRecorder.start();
       updateParentRecordStatus("Recording… 0 seconds");
@@ -1407,8 +1438,8 @@
       },250);
     }catch(error){
       parentVoiceStream?.getTracks().forEach(track=>track.stop());parentVoiceStream=null;
-      toast(error?.name==="NotAllowedError"?"Microphone access was denied. Allow microphone access in this site's browser settings, then try again.":"The microphone could not start. You can upload an audio file instead.");
-      const record=await BB.parentVoices.getForParent(parentVoiceActor,editingParentVoicePhrase);
+      toast(error?.name==="NotAllowedError"?"Microphone access is needed only to record a voice for this communication card. You can still upload an audio file or use the default voice.":"The microphone could not start. You can still upload an audio file or use the default voice.");
+      const record=await BB.parentVoices.getForParent(parentVoiceActor,{recordingId:editingParentVoiceRecordingId});
       modal(voiceEditorContent(editingParentVoicePhrase,record),`Parent voice for ${editingParentVoicePhrase}`);
     }
   }
@@ -1442,7 +1473,7 @@
       const duration=await audioDuration(file);
       if(duration>15.05){toast("Choose an audio clip that is 15 seconds or shorter.");input.value="";return;}
       stagedParentVoice=file;stagedParentVoiceDuration=duration;stagedParentVoiceSource="upload";
-      const record=await BB.parentVoices.getForParent(parentVoiceActor,editingParentVoicePhrase);
+      const record=await BB.parentVoices.getForParent(parentVoiceActor,{recordingId:editingParentVoiceRecordingId});
       modal(voiceEditorContent(editingParentVoicePhrase,record),`Parent voice for ${editingParentVoicePhrase}`);
       toast("Audio is ready to preview. Tap Save Voice when it sounds right.");
     }catch(error){toast(error.message||"That audio file could not be read.");input.value="";}
@@ -1454,14 +1485,14 @@
     const profileIds=[...document.querySelectorAll("[data-parent-voice-profile]:checked")].map(input=>input.dataset.parentVoiceProfile);
     try{
       const savedPhrase=editingParentVoicePhrase;
-      await BB.parentVoices.save(parentVoiceActor,{cardId:BB_COMMUNICATION_CARDS.cardId("Quick",editingParentVoicePhrase),phrase:editingParentVoicePhrase,blob:stagedParentVoice,source:stagedParentVoiceSource,duration:stagedParentVoiceDuration,allProfiles:all,profileIds});
+      await BB.parentVoices.save(parentVoiceActor,{recordingId:editingParentVoiceRecordingId,cardId:editingParentVoiceCardId,categoryId:editingParentVoiceCategory,phrase:editingParentVoicePhrase,blob:stagedParentVoice,source:stagedParentVoiceSource,duration:stagedParentVoiceDuration,allProfiles:all,profileIds});
       await loadParentVoices();
       closeParentVoiceEditor();view.innerHTML=route==="parentVoiceLibrary"?renderParentVoiceLibrary():renderQuickTalkVoices();toast(`Parent voice saved for “${savedPhrase}”`);
     }catch(error){toast(error.message||"That parent voice could not be saved.");}
   }
 
   function closeParentVoiceEditor(){
-    stopParentVoiceRecording(true);stagedParentVoice=null;stagedParentVoiceDuration=0;stagedParentVoiceSource="";editingParentVoicePhrase="";modalRoot.innerHTML="";
+    stopParentVoiceRecording(true);stagedParentVoice=null;stagedParentVoiceDuration=0;stagedParentVoiceSource="";editingParentVoicePhrase="";editingParentVoiceCategory="";editingParentVoiceCardId="";editingParentVoiceRecordingId="";modalRoot.innerHTML="";
   }
 
   function renderLearning(){
@@ -1594,7 +1625,7 @@
           <small>These details create private, profile-aware Emergency cards. Add only what you want the child to be able to show or play.</small>
         </details>
       </div>
-      <div class="mobile-profile-actions"><button class="mobile-button secondary" type="button" data-action="add-profile"><span>➕</span><strong>Add another profile</strong><small>Create a separate private journey</small></button><button class="mobile-button secondary" type="button" data-route="quickTalkVoices"><span>🎙️</span><strong>Quick Talk Voices</strong><small>Record, upload, preview, and assign familiar voices</small></button><button class="mobile-button secondary" type="button" data-route="parentVoiceLibrary"><span>🎧</span><strong>Parent Voice Library</strong><small>Search and manage private card voices</small></button><button class="mobile-button secondary" type="button" data-route="communication"><span>💬</span><strong>All Communication Cards</strong><small>Manage custom cards and existing family voices</small></button></div>
+      <div class="mobile-profile-actions"><button class="mobile-button secondary" type="button" data-action="add-profile"><span>➕</span><strong>Add another profile</strong><small>Create a separate private journey</small></button><button class="mobile-button secondary" type="button" data-route="quickTalkVoices"><span>🎙️</span><strong>Parent Card Voices</strong><small>Quick Talk, Feelings, and Calm & Sensory</small></button><button class="mobile-button secondary" type="button" data-route="parentVoiceLibrary"><span>🎧</span><strong>Parent Voice Library</strong><small>Search, filter, and manage private card voices</small></button><button class="mobile-button secondary" type="button" data-route="communication"><span>💬</span><strong>All Communication Cards</strong><small>Manage custom cards and existing family voices</small></button></div>
       <div class="mobile-section-title"><h2>Caregiver controls</h2></div><div class="mobile-parent-actions"><button class="mobile-button secondary" type="button" data-route="videoApprovals">📨 Video Approval Requests</button><button class="mobile-button secondary" type="button" data-route="videoManager">📺 Manage approved videos</button><button class="mobile-button secondary" type="button" data-route="tools">🧰 Open My Tools</button><button class="mobile-button secondary" type="button" data-action="change-pin">🔢 Change PIN</button><button class="mobile-button secondary" type="button" data-action="lock-parent">🔒 Lock area</button><button class="mobile-button secondary" type="button" data-action="export">⬇ Export progress</button>${data.profiles.length>1?`<button class="mobile-button danger" type="button" data-action="delete-profile">🗑️ Delete this profile</button>`:""}<button class="mobile-button danger" type="button" data-action="reset">⚠️ Reset BrightBridge</button></div>
     </section>`;
   }
@@ -1703,12 +1734,27 @@
     catch{toast("That audio file could not be saved.");}
   }
 
-  async function speakExact(text){
-    BB.speech.stop();BB.parentVoices.stop();
-    const customPlayed=await BB.parentVoices.playForChild(text,activeProfile().id,BB.store.data.settings.speechVolume);
+  async function speakExact(text,cardCategory="",cardId=""){
+    const generation=++speechGeneration;
+    BB.speech.stop();BB.parentVoices.stop();window.speechSynthesis?.cancel();
+    const eligible=BB_COMMUNICATION_CARDS.isParentVoiceEligible(cardCategory);
+    const parentRecord=eligible?await BB.parentVoices.getForChild({phrase:text,categoryId:cardCategory,cardId},activeProfile().id):null;
+    if(generation!==speechGeneration)return;
+    const customPlayed=parentRecord?await BB.parentVoices.playBlob(parentRecord.blob,BB.store.data.settings.speechVolume):false;
+    if(generation!==speechGeneration)return;
     if(customPlayed)return;
     const played=await BB.speech.speak(text);
-    if(!played)toast(`No family recording yet for “${text}”`);
+    if(generation!==speechGeneration){BB.speech.stop();return;}
+    if(played)return;
+    if(BB.store.data.settings.speech&&"speechSynthesis" in window&&"SpeechSynthesisUtterance" in window){
+      const utterance=new SpeechSynthesisUtterance(text);
+      utterance.lang=BB.store.data.settings.language||"en-US";
+      utterance.rate=Math.max(.6,Math.min(1.25,BB.store.data.settings.speechRate||.86));
+      utterance.volume=Math.max(0,Math.min(1,BB.store.data.settings.speechVolume||.9));
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
+    toast(`No voice is available right now for “${text}”`);
   }
 
   function answerQuiz(index){
@@ -1795,11 +1841,15 @@
     const pinKey=event.target.closest("[data-pin-key]");
     if(pinKey){const input=document.querySelector("[data-pin]");if(!input)return;const key=pinKey.dataset.pinKey;if(key==="clear")input.value="";else if(key==="back")input.value=input.value.slice(0,-1);else if(input.value.length<4)input.value+=key;updatePin();if(input.value.length===4)verifyPin();return;}
     const parentVoiceEdit=event.target.closest("[data-parent-voice-edit]");
-    if(parentVoiceEdit&&parentVoiceActor){openParentVoiceEditor(parentVoiceEdit.dataset.parentVoiceEdit);return;}
+    if(parentVoiceEdit&&parentVoiceActor){openParentVoiceEditor(parentVoiceEdit.dataset.parentVoiceEdit,parentVoiceEdit.dataset.parentVoiceCardCategory||parentVoiceCategory,parentVoiceEdit.dataset.parentVoiceRecordingId||"",parentVoiceEdit.dataset.parentVoiceCardId||"");return;}
     const parentVoicePreview=event.target.closest("[data-parent-voice-preview]");
-    if(parentVoicePreview&&parentVoiceActor){BB.speech.stop();BB.parentVoices.playForParent(parentVoiceActor,parentVoicePreview.dataset.parentVoicePreview,BB.store.data.settings.speechVolume).then(played=>{if(!played)toast("That parent voice could not be played.");});return;}
+    if(parentVoicePreview&&parentVoiceActor){BB.speech.stop();BB.parentVoices.playForParent(parentVoiceActor,{recordingId:parentVoicePreview.dataset.parentVoicePreview},BB.store.data.settings.speechVolume).then(played=>{if(!played)toast("That parent voice could not be played.");});return;}
     const parentVoiceRemove=event.target.closest("[data-parent-voice-remove]");
-    if(parentVoiceRemove&&parentVoiceActor&&confirm(`Remove the parent voice for “${parentVoiceRemove.dataset.parentVoiceRemove}” and restore the existing voice fallback?`)){BB.parentVoices.remove(parentVoiceActor,parentVoiceRemove.dataset.parentVoiceRemove).then(()=>loadParentVoices(true)).then(()=>toast("Parent voice removed. Existing voice fallback restored.")).catch(()=>toast("That voice could not be removed."));return;}
+    if(parentVoiceRemove&&parentVoiceActor&&confirm(`Remove the parent voice for “${parentVoiceRemove.dataset.parentVoiceRemovePhrase}” and restore the existing voice fallback?`)){BB.parentVoices.remove(parentVoiceActor,{recordingId:parentVoiceRemove.dataset.parentVoiceRemove}).then(()=>loadParentVoices(true)).then(()=>toast("Parent voice removed. Existing voice fallback restored.")).catch(()=>toast("That voice could not be removed."));return;}
+    const parentVoiceCategoryButton=event.target.closest("[data-parent-voice-category]");
+    if(parentVoiceCategoryButton){parentVoiceCategory=parentVoiceCategoryButton.dataset.parentVoiceCategory;view.innerHTML=renderQuickTalkVoices();return;}
+    const parentVoiceLaunch=event.target.closest("[data-parent-voice-launch]");
+    if(parentVoiceLaunch){parentVoiceCategory=parentVoiceLaunch.dataset.parentVoiceLaunch;go("quickTalkVoices");return;}
     const duplicateOpen=event.target.closest("[data-duplicate-open]");
     if(duplicateOpen){category=duplicateOpen.dataset.duplicateOpen;closeModal();refreshCommunication();return;}
     const duplicateAnother=event.target.closest("[data-duplicate-another]");
@@ -1809,7 +1859,7 @@
     const categoryButton=event.target.closest("[data-category]");
     if(categoryButton){if(recorder?.state==="recording"){toast("Stop and save before changing card groups.");return;}category=categoryButton.dataset.category;refreshCommunication();return;}
     const word=event.target.closest("[data-word]");
-    if(word){if(recorder?.state==="recording"){toast("Stop and save before using another card.");return;}const value=word.dataset.word;sentence=sentence.trim()?`${sentence.trim()} ${value}`:value;speakExact(value);BB.store.data.wordUse[value]=(BB.store.data.wordUse[value]||0)+1;BB.store.data.recentWords=[value,...BB.store.data.recentWords.filter(item=>item!==value)].slice(0,12);BB.store.save();BB.memoryJourney?.track("communication","First communication card used",{icon:"⭐",detail:value,onceKey:"first-card"});refreshCommunication();pip(value,"😊");return;}
+    if(word){if(recorder?.state==="recording"){toast("Stop and save before using another card.");return;}const value=word.dataset.word;sentence=sentence.trim()?`${sentence.trim()} ${value}`:value;speakExact(value,word.dataset.voiceCategory||"",word.dataset.voiceCardId||"");BB.store.data.wordUse[value]=(BB.store.data.wordUse[value]||0)+1;BB.store.data.recentWords=[value,...BB.store.data.recentWords.filter(item=>item!==value)].slice(0,12);BB.store.save();BB.memoryJourney?.track("communication","First communication card used",{icon:"⭐",detail:value,onceKey:"first-card"});refreshCommunication();pip(value,"😊");return;}
     const favorite=event.target.closest("[data-favorite]");
     if(favorite){if(recorder?.state==="recording"){toast("Stop and save before changing favorites.");return;}const value=favorite.dataset.favorite,list=BB.store.data.favorites;list.includes(value)?list.splice(list.indexOf(value),1):list.push(value);BB.store.save();refreshCommunication();return;}
     const customMove=event.target.closest("[data-custom-move]");
@@ -1846,7 +1896,7 @@
       case "parent-preview-stop":BB.parentVoices.stop();break;
       case "parent-voice-save":saveStagedParentVoice();break;
       case "parent-voice-cancel":closeParentVoiceEditor();break;
-      case "parent-voice-restore":if(parentVoiceActor&&editingParentVoicePhrase&&confirm("Remove this parent voice and restore the existing voice fallback?"))BB.parentVoices.remove(parentVoiceActor,editingParentVoicePhrase).then(()=>loadParentVoices()).then(()=>{closeParentVoiceEditor();view.innerHTML=route==="parentVoiceLibrary"?renderParentVoiceLibrary():renderQuickTalkVoices();toast("Existing voice fallback restored.");});break;
+      case "parent-voice-restore":if(parentVoiceActor&&editingParentVoicePhrase&&confirm("Remove this parent voice and restore the existing voice fallback?"))BB.parentVoices.remove(parentVoiceActor,editingParentVoiceRecordingId?{recordingId:editingParentVoiceRecordingId}:{cardId:editingParentVoiceCardId,categoryId:editingParentVoiceCategory,phrase:editingParentVoicePhrase}).then(()=>loadParentVoices()).then(()=>{closeParentVoiceEditor();view.innerHTML=route==="parentVoiceLibrary"?renderParentVoiceLibrary():renderQuickTalkVoices();toast("Existing voice fallback restored.");});break;
       case "video-form-preview":previewVideoForm();break;
       case "video-save":saveVideoFromForm();break;
       case "video-cancel-edit":editingVideoId="";view.innerHTML=renderVideoManager();resetPageScroll();break;
@@ -1895,6 +1945,7 @@
   function handleChange(event){
     if(event.target.matches("[data-upload-card]"))uploadVoice(event.target);
     if(event.target.matches("[data-parent-voice-upload]"))stageParentVoiceUpload(event.target);
+    if(event.target.matches("[data-parent-voice-filter]")){const filter=event.target.dataset.parentVoiceFilter;if(filter==="category")parentVoiceLibraryCategory=event.target.value;if(filter==="profile")parentVoiceLibraryProfile=event.target.value;if(filter==="source")parentVoiceLibrarySource=event.target.value;view.innerHTML=renderParentVoiceLibrary();}
     if(event.target.matches("[data-parent-voice-all]")&&event.target.checked)document.querySelectorAll("[data-parent-voice-profile]").forEach(input=>input.checked=false);
     if(event.target.matches("[data-parent-voice-profile]")&&event.target.checked){const all=document.querySelector("[data-parent-voice-all]");if(all)all.checked=false;}
     if(event.target.matches("[data-approval-confirm],[data-approval-child]"))updateApprovalButton();
@@ -1907,6 +1958,7 @@
   document.addEventListener("input",handleInput);
   document.addEventListener("change",handleChange);
   document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal();if(event.key==="Enter"&&event.target.matches("[data-pin]"))verifyPin();});
+  document.addEventListener("visibilitychange",()=>{if(document.hidden&&parentVoiceRecorder?.state==="recording")stopParentVoiceRecording();});
   window.addEventListener("bb:reward",()=>{updateHeader();if(BB.store.data.flowers)BB.memoryJourney?.track("reward","First flower grown",{icon:"🌸",onceKey:"first-flower"});if(BB.store.data.butterflies)BB.memoryJourney?.track("reward","First butterfly earned",{icon:"🦋",onceKey:"first-butterfly"});});
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;});
   window.addEventListener("error",event=>{console.error(event.error);toast("Something paused. Please try that touch again.");});
